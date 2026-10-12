@@ -9,7 +9,7 @@ function renderMobileFeed(posts, title, numbered = false) {
 }
 
 function renderMobileHeader() {
-  const titles = { dashboard: '职工首页', voices: '供销心声', policy: '政策服务', notices: '通知公告', profile: '个人中心' };
+  const titles = { dashboard: '职工首页', voices: '供销心声', policy: '政策服务', notices: '消息中心', profile: '个人中心' };
   if (state.postComposerOpen) return `<header class="mobile-app-header mobile-detail-header mobile-editor-header"><button type="button" class="mobile-back-button" onclick="AppPrototype.closePostComposer()">取消</button><strong>${state.editingPostId !== null ? '修改帖子' : '发表帖子'}</strong><button type="button" class="mobile-header-submit" onclick="AppPrototype.submitPost()">${state.editingPostId !== null ? '重新提交' : '发布'}</button></header>`;
   if (state.workspaceView === 'policy' && state.policyQuestionOpen) return `<header class="mobile-app-header mobile-detail-header"><button type="button" class="mobile-back-button" title="返回常见问答" onclick="AppPrototype.closePolicyQuestion()">${icon('arrow-left')}<span>返回</span></button><strong>我要提问</strong><span></span></header>`;
   if (state.workspaceView === 'policy' && state.myPolicyQuestionsOpen) return `<header class="mobile-app-header mobile-detail-header"><button type="button" class="mobile-back-button" title="返回常见问答" onclick="AppPrototype.closeMyPolicyQuestions()">${icon('arrow-left')}<span>返回</span></button><strong>我的提问</strong><span></span></header>`;
@@ -68,10 +68,41 @@ function renderMobilePolicyDetail() {
 
 function renderMobileNotices() {
   if (state.noticeDetailId) return renderMobileNoticeDetail();
+  if (state.personalProgressId !== null) return renderMobileProgressDetail();
+  const active = activeMessageTab();
+  return `<div class="mobile-page mobile-notices">${renderMobileMessageTabs()}${renderMobileMessageBody(active)}</div>`;
+}
+function renderMobileMessageTabs() {
+  const active = activeMessageTab();
+  return `<nav class="mobile-segments mobile-sticky-tabs mobile-message-tabs" aria-label="消息中心分类">${MESSAGE_TABS.map((tab) => { const unread = messageTabUnread(tab); return `<button type="button" class="${active === tab ? 'active' : ''}" onclick="AppPrototype.setMessageTab('${tab}')">${tab}${unread ? `<b>${unread}</b>` : ''}</button>`; }).join('')}</nav>`;
+}
+function renderMobileMessageBody(active = activeMessageTab()) {
+  if (active === '官方回复') return renderMobileOfficialReplyMessages();
+  if (active === '业务通知') return renderMobileBusinessNotifications();
+  return renderMobileNoticeList();
+}
+function renderMobileNoticeList() {
   const tabs = ['全部', '未读', '已读'];
   const notices = homeNotices.filter((notice) => state.noticeTab === '全部' || Boolean(state.noticeRead[notice.id]) === (state.noticeTab === '已读'));
-  const unread = homeNotices.filter((notice) => !state.noticeRead[notice.id]).length;
-  return `<div class="mobile-page mobile-notices"><section class="mobile-page-intro"><span>${unread ? `${unread} 条未读` : '全部已读'}</span><h1>通知公告</h1><p>平台规则、服务说明和工作提示集中查看。</p><button type="button" onclick="AppPrototype.markAllNoticesRead()">全部标记已读</button></section><nav class="mobile-segments mobile-sticky-tabs mobile-board-tabs">${tabs.map((label) => `<button type="button" class="${state.noticeTab === label ? 'active' : ''}" onclick="AppPrototype.setNoticeTab('${label}')">${label}</button>`).join('')}</nav><section class="mobile-notice-list">${notices.map((notice) => `<article class="mobile-notice-card ${state.noticeRead[notice.id] ? 'read' : ''}"><div><span>${icon('megaphone')} 通知公告</span><small>${escapeHtml(notice.meta)}</small></div><h2>${escapeHtml(notice.title)}${state.noticeRead[notice.id] ? '' : '<i></i>'}</h2><p>${escapeHtml(notice.summary)}</p><div class="mobile-notice-actions">${state.noticeRead[notice.id] ? '' : `<button type="button" onclick="AppPrototype.readNotice('${notice.id}')">我已知悉</button>`}<button type="button" class="primary" onclick="AppPrototype.openNotice('${notice.id}')">立即查看 ${icon('arrow-right')}</button></div></article>`).join('')}<footer class="feed-end"><span>${notices.length ? '没有更多了' : '当前暂无通知'}</span></footer></section></div>`;
+  const unread = noticeUnreadCount();
+  return `<section class="mobile-page-intro"><span>${unread ? `${unread} 条未读` : '全部已读'}</span><h1>通知公告</h1><p>平台规则、服务说明和工作提示集中查看。</p><button type="button" onclick="AppPrototype.markAllNoticesRead()">全部标记已读</button></section><section class="mobile-notice-list">${notices.map((notice) => `<article class="mobile-notice-card ${state.noticeRead[notice.id] ? 'read' : ''}"><div><span>${icon('megaphone')} 通知公告</span><small>${escapeHtml(notice.meta)}</small></div><h2>${escapeHtml(notice.title)}${state.noticeRead[notice.id] ? '' : '<i></i>'}</h2><p>${escapeHtml(notice.summary)}</p><div class="mobile-notice-actions">${state.noticeRead[notice.id] ? '' : `<button type="button" onclick="AppPrototype.readNotice('${notice.id}')">我已知悉</button>`}<button type="button" class="primary" onclick="AppPrototype.openNotice('${notice.id}')">立即查看 ${icon('arrow-right')}</button></div></article>`).join('')}<footer class="feed-end"><span>${notices.length ? '没有更多了' : '当前暂无通知'}</span></footer></section>`;
+}
+function renderMobileInteractionMessages() {
+  const replies = officialReplyItems();
+  const unread = interactionUnreadCount() + replies.filter((item) => item.unread).length;
+  const interactions = personalInteractions.map((item, index) => { const read = Boolean(state.interactionRead[index]); return `<article class="mobile-notice-card ${read ? 'read' : ''}"><div><span>${escapeHtml(item.type)}</span><small>${escapeHtml(item.detail)}</small></div><h2>${escapeHtml(item.title)}${read ? '' : '<i></i>'}</h2><p>${escapeHtml(item.content)}</p><div class="mobile-notice-actions"><button type="button" class="primary" onclick="AppPrototype.readInteraction(${index})">查看 ${icon('arrow-right')}</button></div></article>`; });
+  const replyCards = replies.map((item) => `<article class="mobile-notice-card ${item.read ? 'read' : ''}"><div><span>官方回复</span><small>${escapeHtml(item.at || '时间未记录')}</small></div><h2>${escapeHtml(item.title)}${item.unread ? '<i></i>' : ''}</h2><p>${escapeHtml(item.summary)}</p><div class="mobile-notice-actions"><span class="mobile-reply-scope">${item.publicReply ? '公开答复' : '仅本人可见'}</span><button type="button" class="primary" onclick="AppPrototype.readReply('${escapeHtml(item.postId)}')">查看 ${icon('arrow-right')}</button></div></article>`);
+  return `<section class="mobile-page-intro"><span>${unread ? `${unread} 条未读` : '全部已读'}</span><h1>互动消息</h1><p>评论、点赞、举报与官方回复集中查看。</p><button type="button" onclick="AppPrototype.markAllInteractionsRead(); AppPrototype.markAllRepliesRead();">全部标记已读</button></section><section class="mobile-notice-list">${interactions.concat(replyCards).join('') || '<p class="knowledge-notice-empty">暂无互动消息</p>'}<footer class="feed-end"><span>${interactions.length + replyCards.length ? '没有更多了' : ''}</span></footer></section>${renderInteractionDetail()}`;
+}
+function renderMobileBusinessNotifications() {
+  const items = businessNotificationItems();
+  const unread = businessNotificationUnreadCount();
+  return `<section class="mobile-page-intro"><span>${unread ? `${unread} 条未读` : '全部已读'}</span><h1>业务通知</h1><p>事项进展、审核结果与办理节点提醒。</p></section><section class="mobile-notice-list">${items.length ? items.map((item) => `<article class="mobile-notice-card ${item.read ? 'read' : ''}"><div><span>业务通知</span><small>${escapeHtml(item.detail)}</small></div><h2>${escapeHtml(item.title)}${item.read ? '' : '<i></i>'}</h2><p>${escapeHtml(item.content)}</p><div class="mobile-notice-actions"><button type="button" class="primary" onclick="AppPrototype.openPostProgress('${escapeHtml(item.postId || '')}')">查看 ${icon('arrow-right')}</button></div></article>`).join('') : '<p class="knowledge-notice-empty">暂无业务通知</p>'}<footer class="feed-end"><span>${items.length ? '没有更多了' : ''}</span></footer></section>`;
+}
+function renderMobileOfficialReplyMessages() {
+  const items = officialReplyItems();
+  const unread = replyUnreadCount();
+  return `<section class="mobile-page-intro"><span>${unread ? `${unread} 条未读` : '全部已读'}</span><h1>官方回复</h1><p>本人发言收到的办理答复。</p><button type="button" onclick="AppPrototype.markAllRepliesRead()">全部标记已读</button></section><section class="mobile-notice-list">${items.length ? items.map((item) => `<article class="mobile-notice-card ${item.read ? 'read' : ''}"><div><span>官方回复</span><small>${escapeHtml(item.at || '时间未记录')}</small></div><h2>${escapeHtml(item.title)}${item.unread ? '<i></i>' : ''}</h2><p>${escapeHtml(item.summary)}</p><div class="mobile-notice-actions"><span class="mobile-reply-scope">${item.publicReply ? '公开答复' : '仅本人可见'}</span><button type="button" class="primary" onclick="AppPrototype.readReply('${escapeHtml(item.postId)}')">查看回复 ${icon('arrow-right')}</button></div></article>`).join('') : '<p class="knowledge-notice-empty">暂无官方回复</p>'}<footer class="feed-end"><span>${items.length ? '没有更多了' : ''}</span></footer></section>`;
 }
 
 function renderMobileNoticeDetail() {
@@ -174,8 +205,8 @@ function renderMobileContent() {
 }
 
 function renderMobileBottomNav() {
-  const items = [['dashboard', '首页', 'home'], ['voices', '心声', 'messages-square'], ['notices', '公告', 'bell'], ['profile', '我的', 'user-round']];
-  return `<nav class="mobile-bottom-nav" aria-label="移动端主导航">${items.map(([id, label, iconName]) => `<button type="button" class="${state.workspaceView === id ? 'active' : ''}" onclick="AppPrototype.setWorkspaceView('${id}')">${icon(iconName)}<span>${label}</span>${id === 'notices' && homeNotices.some((notice) => !state.noticeRead[notice.id]) ? '<i></i>' : ''}</button>`).join('')}</nav>`;
+  const items = [['dashboard', '首页', 'home'], ['voices', '心声', 'messages-square'], ['notices', '消息', 'bell'], ['profile', '我的', 'user-round']];
+  return `<nav class="mobile-bottom-nav" aria-label="移动端主导航">${items.map(([id, label, iconName]) => `<button type="button" class="${state.workspaceView === id ? 'active' : ''}" onclick="AppPrototype.setWorkspaceView('${id}')">${icon(iconName)}<span>${label}</span>${id === 'notices' && messageUnreadTotal() ? '<i></i>' : ''}</button>`).join('')}</nav>`;
 }
 
 function renderMobileWorkspace() {

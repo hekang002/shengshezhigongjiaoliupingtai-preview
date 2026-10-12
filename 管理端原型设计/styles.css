@@ -631,6 +631,7 @@ a { color: inherit; text-decoration: none; }
 .modal-body .field > span { font-size: 12px; font-weight: 700; }
 .banner-list-item { display: flex; align-items: center; gap: 12px; min-width: 220px; }
 .banner-list-item img { width: 112px; aspect-ratio: 16 / 9; object-fit: cover; background: #eee; flex: none; }
+.banner-thumb { width: 72px; height: 40px; object-fit: cover; border: 1px solid var(--line); border-radius: 4px; background: #f5f6f6; }
 .banner-list-item strong { line-height: 1.5; }
 .banner-upload-preview { margin: -6px 0 16px; color: var(--muted); font-size: 12px; }
 .banner-upload-preview img { width: min(100%, 400px); aspect-ratio: 16 / 9; object-fit: cover; display: block; }
@@ -771,6 +772,7 @@ a { color: inherit; text-decoration: none; }
 .review-history p { margin: 8px 0 0; color: var(--muted); }
 .content-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
 .content-tabs .review-status-tab { flex: 0 0 auto; }
+.content-tabs .review-status-tab[data-action="ledger-tab"][data-id="回收站"] { margin-left:auto; border-left:1px solid var(--line); }
 .content-tabs-module { gap: 8px; margin: 16px 0 12px; border-bottom: 0; }
 .content-tabs-module .review-status-tab { min-width: 148px; min-height: 48px; justify-content: space-between; padding: 11px 16px; border: 1px solid var(--line); background: #f4f5f6; color: var(--ink); }
 .content-tabs-module .review-status-tab:hover { background: #fff; color: var(--brand); border-color: #e4b7b7; }
@@ -1591,6 +1593,7 @@ a { color: inherit; text-decoration: none; }
 .content-risk-cell { min-width: 180px; display: flex; align-items: flex-start; gap: 9px; }
 .content-risk-cell > div { min-width: 0; display: grid; gap: 3px; }
 .content-risk-cell > div > span { max-width: 170px; overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.content-risk-cell .content-risk-hit-summary { display: block; height: 18px; line-height: 18px; }
 .content-risk-cell small { color: var(--muted); font-size: 11px; }
 .content-route { display: block; max-width: 175px; color: var(--ink); font-size: 12px; line-height: 1.55; }
 .content-review-detail-modal { display: flex; flex-direction: column; width: min(1120px, calc(100vw - 48px)); height: min(820px, calc(100vh - 40px)); height: min(820px, calc(100dvh - 40px)); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow: hidden; }
@@ -2434,3 +2437,19 @@ a { color: inherit; text-decoration: none; }
 .wb-focus-row > .badge { justify-self: end; }
 /* The workbench is a desktop-only management surface. Keep its information architecture
    stable in narrow browser panels and let the desktop canvas scroll horizontally. */
+/* Permission-controlled anonymous identity viewer */
+.post-detail-meta dd .btn { margin-left: 8px; vertical-align: middle; }
+.cockpit-identity-action { display: flex; align-items: center; gap: 10px; margin-top: 15px; }
+.cockpit-identity-action span { color: #7b8797; font-size: 12px; }
+.identity-security-note { display: flex; gap: 12px; margin-bottom: 18px; padding: 14px 16px; border: 1px solid #cfe2f8; border-radius: 6px; color: #245f9d; background: #f2f8ff; }
+.identity-security-note .icon { margin-top: 2px; }
+.identity-security-note strong, .identity-security-note p { display: block; margin: 0; }
+.identity-security-note p { margin-top: 3px; color: #62758c; font-size: 12px; }
+.identity-profile { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.identity-profile > span { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #347fcd; font-size: 18px; font-weight: 700; }
+.identity-profile > div { flex: 1; }
+.identity-profile strong, .identity-profile p { display: block; margin: 0; }
+.identity-profile p { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.permission-sensitive-toggle { padding: 13px 14px; border: 1px solid #ead9b3; background: #fffaf0; }
+.permission-sensitive-toggle .sys-check-line { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.permission-sensitive-toggle small { display: block; margin-top: 6px; color: var(--muted); line-height: 1.6; }

@@ -169,7 +169,7 @@ function ownedStaffPosts(data = PrototypeData.read()) {
     .filter((post) => {
       const currentAuthor = Boolean(accountId && post.authorId === accountId);
       const legacyDemoAuthor = accountId === 'staff' && !post.authorId && personalIds.has(String(post.id));
-      return staffProgressBoards.includes(post.board) && (currentAuthor || legacyDemoAuthor);
+      return currentAuthor || legacyDemoAuthor;
     })
     .sort((a, b) => postTimestamp(b) - postTimestamp(a));
 }
@@ -411,7 +411,7 @@ const roleMeta = { staff: ['职工', 'user-round'], handler: ['承办', 'briefca
 const MANAGEMENT_APP_URL = new URL('管理端原型设计/index.html?v=20260916-explicit-entry', document.baseURI).href;
 function openHandlerWorkspace(account) { sessionStorage.setItem('prototype-handler-account-id', account.id); const url = new URL(MANAGEMENT_APP_URL); url.searchParams.set('role', 'handler'); window.location.href = url.href; }
 function openManagementWorkspace(roleOrAccount) { const account = typeof roleOrAccount === 'string' ? accounts.find((item) => item.role === roleOrAccount && item.status === 'approved') : roleOrAccount; if (!account) return showToast('暂无可用的演示账号。'); const role = account.role === 'admin' ? 'platform' : account.role; sessionStorage.setItem('prototype-management-account-id', account.id); if (role === 'handler') sessionStorage.setItem('prototype-handler-account-id', account.id); const url = new URL(MANAGEMENT_APP_URL); url.searchParams.set('role', role); window.location.href = url.href; }
-const state = { view: 'login', loginPortal: 'staff', loginMode: 'password', authDisplayMode: 'desktop', error: '', notice: '', session: null, staffDisplayMode: 'desktop', workspaceView: 'dashboard', profileOpen: false, accountCenterOpen: false, accountCenterTab: 'basic', personalTab: 'posts', mobilePersonalSection: null, personalPostCategory: '建言献策', personalInteractionCategory: '评论', personalExpandedPostId: null, personalProgressId: null, progressListOpen: false, editingPostId: null, personalFavoriteIndex: null, personalEditOpen: false, interactionDetail: null, postComposerOpen: false, policyQuestionOpen: false, myPolicyQuestionsOpen: false, hotPolicyOpen: false, smsRemaining: 0, portalTab: '全部', homeContentTab: '全部', policyTab: 'policy', policyDetailId: null, bannerDetail: null, noticeDetailId: null, noticeTab: '全部', noticeRead: {}, noticeCarouselIndex: 0, bannerIndex: 0, postActions: {}, expandedPostId: null, commentPostId: null, reportPostId: null, replyTarget: '', rankModal: null, rankingDetail: null };
+const state = { view: 'login', loginPortal: 'staff', loginMode: 'password', authDisplayMode: 'desktop', error: '', notice: '', session: null, staffDisplayMode: 'desktop', workspaceView: 'dashboard', profileOpen: false, accountCenterOpen: false, accountCenterTab: 'basic', personalTab: 'posts', mobilePersonalSection: null, personalPostCategory: '全部', personalInteractionCategory: '评论', personalExpandedPostId: null, personalProgressId: null, progressListOpen: false, editingPostId: null, personalFavoriteIndex: null, personalEditOpen: false, interactionDetail: null, postComposerOpen: false, draftBoxOpen: false, editingDraftId: null, composeBuffer: null, voiceSearch: '', policyQuestionOpen: false, myPolicyQuestionsOpen: false, hotPolicyOpen: false, smsRemaining: 0, portalTab: '全部', homeContentTab: '全部', policyTab: 'policy', policyDetailId: null, bannerDetail: null, noticeTab: '全部', noticeRead: {}, noticeCarouselIndex: 0, messageTab: '官方回复', interactionRead: {}, replyRead: {}, bannerIndex: 0, postActions: {}, expandedPostId: null, commentPostId: null, reportPostId: null, replyTarget: '', rankModal: null, rankingDetail: null };
 const icon = (name) => `<i data-lucide="${name}" class="icon"></i>`;
 const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
 const byId = (id) => document.getElementById(id);
@@ -441,7 +441,7 @@ function getAccount(identifier) { const value = phoneValue(identifier); return a
 function authError(message) { setState({ error: message, notice: '' }); }
 function clearFeedback() { state.error = ''; state.notice = ''; }
 function recordLogin(account, result, message, method = state.loginMode) { const data = PrototypeData.read(); data.loginLogs.unshift({ account: account || '未识别账号', platform: '统一登录页', method: method === 'sms' ? '短信验证码' : '账号密码', result, message, at: new Date().toLocaleString('sv-SE', { hour12: false }) }); PrototypeData.save(data); }
-function submitLogin() { clearFeedback(); let account, identifier; if (state.loginMode === 'password') { identifier = byId('identifier')?.value.trim(); const password = byId('password')?.value; if (!identifier || !password) return authError('请输入账号（或手机号）和登录密码。'); account = getAccount(identifier); if (!account || account.password !== password) { recordLogin(identifier, '失败', '账号或登录密码不正确'); return authError('账号或登录密码不正确。'); } } else { identifier = byId('phone')?.value; const sms = byId('sms')?.value.trim(); if (!validatePhone(identifier)) return authError('请输入正确的 11 位手机号码。'); if (!validateSms(sms)) { recordLogin(identifier, '失败', '演示验证码不正确'); return authError('短信验证码不正确，演示验证码为 202608。'); } account = getAccount(identifier); if (!account) { recordLogin(identifier, '失败', '账号尚未注册'); return authError('该手机号尚未注册，请先提交账号申请。'); } } if (account.status === 'pending') { recordLogin(account.id, '失败', '账号待审核'); return authError('该账号正在等待管理员审核，暂不能登录。'); } if (account.status === 'rejected' || account.enabled === false) { recordLogin(account.id, '失败', '账号不可用'); return authError('该账号未启用或审核未通过，请联系平台管理员。'); } const accountPortal = account.role === 'staff' ? 'staff' : 'management'; if (accountPortal !== state.loginPortal) { recordLogin(account.id, '失败', '登录端不匹配'); return authError(`该账号属于${accountPortal === 'staff' ? '职工端' : '管理端'}，请切换后登录。`); } recordLogin(account.id, '成功', '登录成功'); if (accountPortal === 'management') return openManagementWorkspace(account); setState({ session: account, view: 'workspace', staffDisplayMode: 'desktop', workspaceView: 'dashboard', error: '', notice: '' }); }
+function submitLogin() { clearFeedback(); let account, identifier; if (state.loginMode === 'password') { identifier = byId('identifier')?.value.trim(); const password = byId('password')?.value; if (!identifier || !password) return authError('请输入账号（或手机号）和登录密码。'); account = getAccount(identifier); if (!account || account.password !== password) { recordLogin(identifier, '失败', '账号或登录密码不正确'); return authError('账号或登录密码不正确。'); } } else { identifier = byId('phone')?.value; const sms = byId('sms')?.value.trim(); if (!validatePhone(identifier)) return authError('请输入正确的 11 位手机号码。'); if (!validateSms(sms)) { recordLogin(identifier, '失败', '演示验证码不正确'); return authError('短信验证码不正确，演示验证码为 202608。'); } account = getAccount(identifier); if (!account) { recordLogin(identifier, '失败', '账号尚未注册'); return authError('该手机号尚未注册，请先提交账号申请。'); } } if (account.status === 'pending') { recordLogin(account.id, '失败', '账号待审核'); return authError('该账号正在等待管理员审核，暂不能登录。'); } if (account.status === 'rejected' || account.enabled === false) { recordLogin(account.id, '失败', '账号不可用'); return authError('该账号未启用或审核未通过，请联系平台管理员。'); } const accountPortal = account.role === 'staff' ? 'staff' : 'management'; if (accountPortal !== state.loginPortal) { recordLogin(account.id, '失败', '登录端不匹配'); return authError(`该账号属于${accountPortal === 'staff' ? '职工端' : '管理端'}，请切换后登录。`); } recordLogin(account.id, '成功', '登录成功'); if (accountPortal === 'management') return openManagementWorkspace(account); applyMessageReadState(account.id); setState({ session: account, view: 'workspace', staffDisplayMode: 'desktop', workspaceView: 'dashboard', error: '', notice: '' }); }
 function submitRegistration() { clearFeedback(); const name = byId('registerName')?.value.trim(); const phone = phoneValue(byId('registerPhone')?.value); const department = byId('registerDepartment')?.value.trim(); const password = byId('registerPassword')?.value || ''; const confirm = byId('registerConfirm')?.value || ''; const sms = byId('registerSms')?.value.trim(); if (!name) return authError('请输入本人真实姓名。'); if (!validatePhone(phone)) return authError('请输入正确的 11 位手机号码。'); if (!department) return authError('请输入申请部门。'); if (getAccount(phone)) return authError('该手机号已存在，请直接登录或找回密码。'); if (password.length < 6) return authError('登录密码至少需要 6 位。'); if (password !== confirm) return authError('两次输入的密码不一致。'); if (!validateSms(sms)) return authError('短信验证码不正确，演示验证码为 202608。'); const submitted = new Date().toLocaleString('sv-SE', { hour12: false }); const account = { id: `app-${Date.now()}`, phone, password, role: 'staff', name, department, status: 'pending', submitted }; accounts.push(account); const data = PrototypeData.read(); data.accounts.push({ id: account.id, phone, name: account.name, department, status: 'pending', submitted, createdAt: submitted }); PrototypeData.save(data); sessionStorage.setItem(`prototype-account-${phone}`, JSON.stringify({ id: account.id, phone, password, role: 'staff', name: account.name, department, submitted })); setState({ view: 'login', loginMode: 'password', error: '', notice: '申请已提交，等待管理员审核后方可登录。' }); }
 function submitReset() { clearFeedback(); const phone = phoneValue(byId('resetPhone')?.value); const sms = byId('resetSms')?.value.trim(); const password = byId('resetPassword')?.value || ''; const confirm = byId('resetConfirm')?.value || ''; if (!validatePhone(phone)) return authError('请输入正确的 11 位手机号码。'); const account = getAccount(phone); if (!account) return authError('该手机号尚未注册。'); if (account.status !== 'approved') return authError(account.status === 'pending' ? '账号正在等待管理员审核，暂不能重置密码。' : '账号审核未通过，暂不能重置密码。'); if (!validateSms(sms)) return authError('短信验证码不正确，演示验证码为 202608。'); if (password.length < 6) return authError('新密码至少需要 6 位。'); if (password !== confirm) return authError('两次输入的密码不一致。'); account.password = password; setState({ view: 'login', loginMode: 'password', notice: '密码已重置，请使用新密码登录。', error: '' }); }
 function queryApproval() { clearFeedback(); const phone = phoneValue(byId('queryPhone')?.value); if (!validatePhone(phone)) return authError('请输入正确的 11 位注册手机号码。'); const account = getAccount(phone); if (!account) return authError('未查询到该手机号的账号申请记录。'); const message = account.status === 'approved' ? '该账号已审核通过，可以直接登录平台。' : account.status === 'pending' ? '该账号正在等待管理员审核，请稍后查询。' : '该账号审核未通过，请联系平台管理员。'; setState({ error: '', notice: message }); }
@@ -449,8 +449,8 @@ function sendSms() { showToast('验证码已发送（演示验证码：202608）
 
 function renderStaffSearchResults() { const input = byId('staff-search-keyword'), panel = byId('staff-search-results'); if (!input || !panel) return; const rows = PrototypeData.searchContent(input.value); panel.hidden = false; panel.innerHTML = rows.length ? `<div class="staff-search-caption">${input.value.trim() ? `找到 ${rows.length} 条结果` : '默认展示最近内容'}</div>${rows.map((item) => `<button type="button" onmousedown="event.preventDefault();AppPrototype.openSearchResult('${item.type}','${escapeHtml(item.id)}')"><span class="staff-search-type">${item.type}</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.meta)}</small></span>${icon('chevron-right')}</button>`).join('')}` : '<div class="staff-search-empty">未找到匹配内容，请增加或调整关键词</div>'; }
 function closeStaffSearchResults() { setTimeout(() => { const panel = byId('staff-search-results'); if (panel) panel.hidden = true; }, 120); }
-function renderTopbar() { const initials = state.session.name.slice(0, 1); return `<header class="workspace-topbar"><div class="topbar-brand"><div class="seal">湖北<br>供销</div><div><strong>湖北供销·心声</strong><span>职工交流平台</span></div></div><div class="topbar-search">${icon('search')}<input id="staff-search-keyword" aria-label="全局搜索关键词" autocomplete="off" placeholder="输入关键词，多个关键词请用空格分隔" onfocus="renderStaffSearchResults()" oninput="renderStaffSearchResults()" onblur="closeStaffSearchResults()"><div class="staff-search-results" id="staff-search-results" hidden></div></div><div class="staff-profile-wrap"><button class="staff-profile-trigger" type="button" aria-haspopup="menu" aria-expanded="${state.profileOpen}" title="打开用户菜单" onclick="AppPrototype.toggleProfileMenu()"><span class="profile-dot">${initials}</span><strong>${escapeHtml(state.session.name)}</strong>${icon(state.profileOpen ? 'chevron-up' : 'chevron-down')}</button>${state.profileOpen ? `<div class="staff-profile-menu" role="menu"><div class="staff-profile-summary"><span class="profile-dot">${initials}</span><div><strong>${escapeHtml(state.session.name)}</strong><small>${escapeHtml(state.session.id)}</small></div></div><button role="menuitem" onclick="AppPrototype.profileAction('center')">${icon('user-round')}<span>个人中心</span></button><button class="staff-profile-logout" role="menuitem" onclick="AppPrototype.profileAction('logout')">${icon('log-out')}<span>退出登录</span></button></div>` : ''}</div></header>`; }
-function renderSidebar() { const role = state.session.role; const nav = role === 'admin' ? [['dashboard', '工作台', 'gauge'], ['review', '账号审核', 'user-round-check', accounts.filter((item) => item.status === 'pending').length], ['content', '内容审核', 'shield-check', 8], ['assign', '事项分办', 'git-pull-request-arrow', 6], ['statistics', '数据统计', 'chart-no-axes-combined']] : role === 'handler' ? [['dashboard', '承办工作台', 'briefcase-business'], ['tasks', '我的待办', 'inbox', 3], ['drafts', '答复草稿', 'files', 5], ['progress', '办理统计', 'chart-no-axes-combined']] : role === 'leader' ? [['dashboard', '运行概览', 'chart-spline'], ['topics', '热点议题', 'messages-square', 14], ['handling', '重点事项', 'clipboard-check', 5], ['analysis', '专题分析', 'chart-no-axes-combined']] : [['dashboard', '首页', 'home'], ['voices', '供销心声', 'messages-square'], ['notices', '通知公告', 'bell', homeNotices.filter((notice) => !state.noticeRead[notice.id]).length], ['profile', '个人中心', 'user-round']]; return `<aside class="workspace-sidebar"><div class="side-caption">${role === 'admin' ? '平台治理' : role === 'handler' ? '事项办理' : role === 'leader' ? '决策视图' : '职工协同'}</div>${nav.map(([id, label, iconName, count]) => `<button class="side-item ${state.workspaceView === id || (id === 'dashboard' && state.workspaceView === 'dashboard') ? 'active' : ''}" onclick="AppPrototype.setWorkspaceView('${id}')">${icon(iconName)}<span>${label}</span>${count ? `<span class="badge">${count}</span>` : ''}</button>`).join('')}<div class="sidebar-note">合理诉求充分保护<br>违规内容依法依规处理</div></aside>`; }
+function renderTopbar() { const initials = state.session.name.slice(0, 1); return `<header class="workspace-topbar"><div class="topbar-brand"><div class="seal">湖北<br>供销</div><div><strong>湖北供销·心声</strong><span>湖北省供销合作总社职工交流平台测试</span></div></div><div class="topbar-search">${icon('search')}<input id="staff-search-keyword" aria-label="全局搜索关键词" autocomplete="off" placeholder="搜索帖子、公告和政策" onfocus="renderStaffSearchResults()" oninput="renderStaffSearchResults()" onblur="closeStaffSearchResults()"><div class="staff-search-results" id="staff-search-results" hidden></div></div><div class="staff-profile-wrap"><button class="staff-profile-trigger" type="button" aria-haspopup="menu" aria-expanded="${state.profileOpen}" title="打开用户菜单" onclick="AppPrototype.toggleProfileMenu()"><span class="profile-dot">${initials}</span><strong>${escapeHtml(state.session.name)}</strong>${icon(state.profileOpen ? 'chevron-up' : 'chevron-down')}</button>${state.profileOpen ? `<div class="staff-profile-menu" role="menu"><div class="staff-profile-summary"><span class="profile-dot">${initials}</span><div><strong>${escapeHtml(state.session.name)}</strong><small>${escapeHtml(state.session.id)}</small></div></div><button role="menuitem" onclick="AppPrototype.profileAction('center')">${icon('user-round')}<span>个人中心</span></button><button class="staff-profile-logout" role="menuitem" onclick="AppPrototype.profileAction('logout')">${icon('log-out')}<span>退出登录</span></button></div>` : ''}</div></header>`; }
+function renderSidebar() { const role = state.session.role; const nav = role === 'admin' ? [['dashboard', '工作台', 'gauge'], ['review', '账号审核', 'user-round-check', accounts.filter((item) => item.status === 'pending').length], ['content', '内容审核', 'shield-check', 8], ['assign', '事项分办', 'git-pull-request-arrow', 6], ['statistics', '数据统计', 'chart-no-axes-combined']] : role === 'handler' ? [['dashboard', '承办工作台', 'briefcase-business'], ['tasks', '我的待办', 'inbox', 3], ['drafts', '答复草稿', 'files', 5], ['progress', '办理统计', 'chart-no-axes-combined']] : role === 'leader' ? [['dashboard', '运行概览', 'chart-spline'], ['topics', '热点议题', 'messages-square', 14], ['handling', '重点事项', 'clipboard-check', 5], ['analysis', '专题分析', 'chart-no-axes-combined']] : [['dashboard', '首页', 'home'], ['voices', '供销心声', 'messages-square'], ['notices', '消息中心', 'bell', messageUnreadTotal()], ['profile', '个人中心', 'user-round']]; return `<aside class="workspace-sidebar"><div class="side-caption">${role === 'admin' ? '平台治理' : role === 'handler' ? '事项办理' : role === 'leader' ? '决策视图' : '职工协同'}</div>${nav.map(([id, label, iconName, count]) => `<button class="side-item ${state.workspaceView === id || (id === 'dashboard' && state.workspaceView === 'dashboard') ? 'active' : ''}" onclick="AppPrototype.setWorkspaceView('${id}')">${icon(iconName)}<span>${label}</span>${count ? `<span class="badge">${count}</span>` : ''}</button>`).join('')}<div class="sidebar-note">合理诉求充分保护<br>违规内容依法依规处理</div></aside>`; }
 function metricCard([label, value, note, type]) { return `<article class="metric ${type || ''}"><label>${label}</label><strong>${value}</strong><span>${note}</span></article>`; }
 function statusClass(value) { return /超期|待受理|待审核|待分办|待答复审核|待补充/.test(value) ? 'warn' : /已发布|已答复|已办结/.test(value) ? 'done' : ''; }
 function getRankTotal(item, type) { const { scoreKey } = rankFormula[type]; return item.essenceScore + item[scoreKey]; }
@@ -466,7 +466,7 @@ function renderRankingPanel(type, { limit = 10, showMore = true, className = '' 
   return `<section class="portal-panel ranking-panel ${className}"><header class="portal-panel-head"><div class="ranking-heading"><h2>${config.title}</h2></div>${showMore ? `<button type="button" onclick="AppPrototype.openRanking('${type}')">更多 ${icon('arrow-right')}</button>` : ''}</header><div class="ranking-list">${items.map((item, index) => renderRankingRow(item, type, index)).join('')}</div></section>`;
 }
 function getPortalPosts() {
-  return portalPosts.filter((post) => !post.managedUnavailable && PrototypeData.isPublicPost(post) && (state.portalTab === '全部' || post.board === state.portalTab));
+  return portalPosts.filter((post) => !post.managedUnavailable && PrototypeData.isPublicPost(post) && (state.portalTab === '全部' || post.board === state.portalTab) && (!state.voiceSearch || `${post.title} ${post.excerpt} ${post.author}`.includes(state.voiceSearch)));
 }
 function renderPortalTabs() {
   const tabNames = ['全部', ...new Set([...PrototypeData.read().boards.map((board) => board.name), ...portalPosts.map((post) => post.board)])];
@@ -492,15 +492,48 @@ function getPostAttachmentError(file) {
   if (file.size > POST_ATTACHMENT_MAX_BYTES) return '附件不能超过 50MB，请重新选择。';
   return '';
 }
+function renderOwnerMenu(id, draft) {
+  queueMicrotask(() => document.querySelectorAll('.owner-operation-menu').forEach((menu) => {
+    menu.onmouseenter = () => { menu.open = true; };
+    menu.querySelector('summary').onclick = (event) => { event.preventDefault(); menu.open = true; };
+    menu.onmouseleave = () => { if (!menu.contains(document.activeElement)) menu.open = false; };
+  }));
+  return `<details class="owner-operation-menu"><summary>操作 ${icon('chevron-down')}</summary><div class="owner-operation-options"><button type="button" data-id="${escapeHtml(id)}" onclick="AppPrototype.ownerRecord(this.dataset.id,${draft})">${icon('list')}查看记录</button><button type="button" data-id="${escapeHtml(id)}" onclick="AppPrototype.ownerSettings(this.dataset.id,${draft})">${icon('settings-2')}设置</button><button type="button" data-id="${escapeHtml(id)}" onclick="AppPrototype.ownerDelete(this.dataset.id,${draft})">${icon('trash-2')}${draft ? '删除草稿' : '删除'}</button></div></details>`;
+}
+function staffDrafts() {
+  try { const rows = JSON.parse(localStorage.getItem('prototype-staff-drafts') || '[]'); return Array.isArray(rows) ? rows.filter((item) => item.authorId === state.session?.id) : []; } catch (_) { return []; }
+}
+function persistStaffDrafts(rows) {
+  let all = [];
+  try { const stored = JSON.parse(localStorage.getItem('prototype-staff-drafts') || '[]'); if (Array.isArray(stored)) all = stored; } catch (_) {}
+  localStorage.setItem('prototype-staff-drafts', JSON.stringify([...all.filter((item) => item.authorId !== state.session?.id), ...rows]));
+}
+function capturePostComposer() {
+  const draft = state.composeBuffer || staffDrafts().find((item) => item.id === state.editingDraftId) || PrototypeData.read().posts.find((item) => String(item.id) === String(state.editingPostId)) || {};
+  const board = PrototypeData.postingBoards().find((item) => item.id === byId('new-post-board')?.value);
+  const file = byId('new-post-attachment')?.files?.[0];
+  return { ...draft, board: board?.name || '', title: byId('new-post-title')?.value.trim() || '', subtitle: byId('new-post-subtitle')?.value.trim() || '', body: byId('new-post-body')?.innerText.trim() || '', publicationMode: document.querySelector('input[name="new-post-identity"]:checked')?.value || 'anonymous', allowComments: byId('new-post-allow-comments')?.checked !== false, attachment: file ? { name: file.name, size: file.size, type: file.type } : document.querySelector('.post-compose-modal')?.dataset.removeAttachment === 'true' ? null : draft.attachment || null };
+}
+function renderDraftBox() {
+  if (!state.draftBoxOpen) return '';
+  return `<aside class="staff-draft-box" aria-label="我的草稿"><header><h3>我的草稿</h3><button type="button" title="关闭草稿箱" onclick="AppPrototype.toggleDraftBox()">${icon('x')}</button></header>${staffDrafts().map((draft) => `<article><div><strong>${escapeHtml(draft.title || '未命名草稿')}</strong><small>${escapeHtml(draft.board || '未选择栏目')} · ${escapeHtml(draft.updatedAt)}</small></div><button type="button" onclick="AppPrototype.editStaffDraft('${draft.id}')">编辑</button><button type="button" onclick="AppPrototype.deleteStaffDraft('${draft.id}')">删除</button></article>`).join('') || '<p class="personal-empty">暂无草稿</p>'}</aside>`;
+}
+function renderPersonalDrafts(category) {
+  const drafts = staffDrafts().filter((item) => category === '全部' || item.board === category);
+  return drafts.map((draft) => `<article class="portal-post-card staff-draft-card"><div class="portal-post-card-head"><span>${escapeHtml(draft.board || '未选择栏目')}</span><small>草稿 · ${escapeHtml(draft.updatedAt)}</small></div><h3>${escapeHtml(draft.title || '未命名草稿')}</h3><p>${escapeHtml(draft.body)}</p><div class="personal-post-owner-actions"><button type="button" onclick="AppPrototype.editStaffDraft('${draft.id}')">${icon('pencil-line')} 修改后重新提交</button>${renderOwnerMenu(draft.id, true)}</div></article>`).join('');
+}
+
 function renderPostComposer() {
   if (!state.postComposerOpen) return '';
   const data = PrototypeData.read();
-  const editingPost = state.editingPostId === null ? null : data.posts.find((post) => String(post.id) === String(state.editingPostId));
-  const boards = PrototypeData.postingBoards(data).filter((board) => board.name !== '回音壁' && (!editingPost || !['建言献策', '心声诉求'].includes(editingPost.board) || board.name === editingPost.board));
-  const identity = editingPost?.publicationMode || (editingPost?.author === '匿名职工' ? 'anonymous' : 'real');
+  const editingPost = state.composeBuffer || (state.editingDraftId ? staffDrafts().find((post) => post.id === state.editingDraftId) : state.editingPostId === null ? null : data.posts.find((post) => String(post.id) === String(state.editingPostId)));
+  const boards = PrototypeData.postingBoards(data).filter((board) => board.name !== '回音壁' && (state.editingPostId === null || !editingPost || !['建言献策', '心声诉求'].includes(editingPost.board) || board.name === editingPost.board));
+  const selectedBoard = boards.find((board) => board.name === editingPost?.board);
+  const commentsEnabled = Boolean(selectedBoard && selectedBoard.allowComments !== false);
+  const identity = editingPost?.publicationMode || staffProfile().publicationMode || 'real';
   const existingAttachment = editingPost?.attachment || null;
   const body = escapeHtml(editingPost?.body || '').replace(/\n/g, '<br>');
-  return `<div class="ranking-backdrop" onclick="AppPrototype.closePostComposer(event)"><section class="ranking-modal post-compose-modal" role="dialog" aria-modal="true" aria-labelledby="post-compose-title"><header class="ranking-modal-head"><div><span>供销心声</span><h2 id="post-compose-title">${editingPost ? '修改帖子' : '发表帖子'}</h2></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closePostComposer()">${icon('x')}</button></header><div class="post-compose-fields"><label><span class="post-field-title">发表栏目 <b class="required-mark" aria-label="必填">*</b></span><select id="new-post-board" required>${boards.map((board) => `<option value="${escapeHtml(board.id)}" ${board.name === editingPost?.board ? 'selected' : ''}>${escapeHtml(board.name)}</option>`).join('')}</select></label><label><span class="post-field-title">帖子标题 <b class="required-mark" aria-label="必填">*</b></span><input id="new-post-title" maxlength="100" placeholder="填写标题" value="${escapeHtml(editingPost?.title || '')}" required></label><label><span class="post-field-title">副标题 <small>选填</small></span><input id="new-post-subtitle" maxlength="160" placeholder="填写副标题" value="${escapeHtml(editingPost?.subtitle || '')}"></label><label><span class="post-field-title">正文内容 <b class="required-mark" aria-label="必填">*</b></span><div class="rich-editor"><div class="rich-toolbar" role="toolbar" aria-label="正文编辑工具"><button type="button" title="加粗" onclick="AppPrototype.formatPost('bold')"><b>B</b></button><button type="button" title="斜体" onclick="AppPrototype.formatPost('italic')"><i>I</i></button><button type="button" title="下划线" onclick="AppPrototype.formatPost('underline')"><u>U</u></button><button type="button" title="项目列表" onclick="AppPrototype.formatPost('insertUnorderedList')">${icon('list')}</button><button type="button" title="引用" onclick="AppPrototype.formatPost('formatBlock', 'blockquote')">${icon('text-quote')}</button><span></span><button type="button" title="撤销" onclick="AppPrototype.formatPost('undo')">${icon('undo-2')}</button><button type="button" title="重做" onclick="AppPrototype.formatPost('redo')">${icon('redo-2')}</button></div><div id="new-post-body" class="rich-editor-body" contenteditable="true" role="textbox" aria-multiline="true" aria-required="true" data-placeholder="写下具体问题、建议或工作经验">${body}</div></div></label><div class="post-attachment-field"><div class="post-field-title">附件上传 <small>选填</small></div><input id="new-post-attachment" class="post-attachment-input" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z,.jpg,.jpeg,.png" onchange="AppPrototype.handlePostAttachment(this)"><div class="post-attachment-picker"><label class="post-attachment-button" for="new-post-attachment">${icon('paperclip')}<span>${existingAttachment ? '替换文件' : '选择文件'}</span></label><div class="post-attachment-copy"><strong id="new-post-attachment-name">${escapeHtml(existingAttachment?.name || '未选择文件')}</strong><small id="new-post-attachment-hint">${existingAttachment ? `${formatPostFileSize(existingAttachment.size)} · 已保留原附件` : '限 1 份，最大 50MB；支持 PDF、Office、TXT、压缩包、JPG/PNG'}</small></div><button type="button" id="new-post-attachment-remove" class="post-attachment-remove" title="移除附件" onclick="AppPrototype.clearPostAttachment()" ${existingAttachment ? '' : 'hidden'}>${icon('x')}</button></div></div><fieldset class="post-publish-settings"><legend>发布设置</legend><div class="post-identity-options"><label class="post-identity-option"><input type="radio" name="new-post-identity" value="real" ${identity === 'real' ? 'checked' : ''}><span>实名发布</span></label><label class="post-identity-option"><input type="radio" name="new-post-identity" value="anonymous" ${identity === 'anonymous' ? 'checked' : ''}><span>匿名发布</span></label></div><div class="post-setting-divider"></div><label class="post-comment-toggle"><span><strong>允许评论</strong><small>关闭后其他职工无法发表评论</small></span><input id="new-post-allow-comments" type="checkbox" role="switch" ${editingPost?.allowComments === false ? '' : 'checked'}><i aria-hidden="true"><b></b></i></label></fieldset><p id="post-compose-error" class="post-compose-error" role="alert" hidden></p></div><footer class="post-compose-actions"><button type="button" onclick="AppPrototype.closePostComposer()">取消</button><button type="button" class="primary" onclick="AppPrototype.submitPost()">${editingPost ? '重新提交' : '提交'}</button></footer></section></div>`;
+  return `<div class="ranking-backdrop" onclick="AppPrototype.closePostComposer(event)"><section class="ranking-modal post-compose-modal" role="dialog" aria-modal="true" aria-labelledby="post-compose-title"><header class="ranking-modal-head"><div><span>供销心声</span><h2 id="post-compose-title">${state.editingPostId !== null ? '修改帖子' : '发表帖子'}</h2></div><button type="button" class="draft-box-trigger" onclick="AppPrototype.toggleDraftBox()">草稿箱 ${staffDrafts().length}</button><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closePostComposer()">${icon('x')}</button></header><div class="post-compose-fields"><label><span class="post-field-title">发表栏目 <b class="required-mark" aria-label="必填">*</b></span><select id="new-post-board" required onchange="AppPrototype.updateComposerBoard()"><option value="">请选择发言栏目</option>${boards.map((board) => `<option value="${escapeHtml(board.id)}" ${board.name === editingPost?.board ? 'selected' : ''}>${escapeHtml(board.name)}</option>`).join('')}</select></label><label><span class="post-field-title">帖子标题 <b class="required-mark" aria-label="必填">*</b></span><input id="new-post-title" maxlength="100" placeholder="填写标题" value="${escapeHtml(editingPost?.title || '')}" required></label><label><span class="post-field-title">副标题 <small>选填</small></span><input id="new-post-subtitle" maxlength="160" placeholder="填写副标题" value="${escapeHtml(editingPost?.subtitle || '')}"></label><label><span class="post-field-title">正文内容 <b class="required-mark" aria-label="必填">*</b></span><div class="rich-editor"><div class="rich-toolbar" role="toolbar" aria-label="正文编辑工具"><button type="button" title="加粗" onclick="AppPrototype.formatPost('bold')"><b>B</b></button><button type="button" title="斜体" onclick="AppPrototype.formatPost('italic')"><i>I</i></button><button type="button" title="下划线" onclick="AppPrototype.formatPost('underline')"><u>U</u></button><button type="button" title="项目列表" onclick="AppPrototype.formatPost('insertUnorderedList')">${icon('list')}</button><button type="button" title="引用" onclick="AppPrototype.formatPost('formatBlock', 'blockquote')">${icon('text-quote')}</button><span></span><button type="button" title="撤销" onclick="AppPrototype.formatPost('undo')">${icon('undo-2')}</button><button type="button" title="重做" onclick="AppPrototype.formatPost('redo')">${icon('redo-2')}</button></div><div id="new-post-body" class="rich-editor-body" contenteditable="true" role="textbox" aria-multiline="true" aria-required="true" data-placeholder="写下具体问题、建议或工作经验">${body}</div></div></label><div class="post-attachment-field"><div class="post-field-title">附件上传 <small>选填</small></div><input id="new-post-attachment" class="post-attachment-input" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z,.jpg,.jpeg,.png" onchange="AppPrototype.handlePostAttachment(this)"><div class="post-attachment-picker"><label class="post-attachment-button" for="new-post-attachment">${icon('paperclip')}<span>${existingAttachment ? '替换文件' : '选择文件'}</span></label><div class="post-attachment-copy"><strong id="new-post-attachment-name">${escapeHtml(existingAttachment?.name || '未选择文件')}</strong><small id="new-post-attachment-hint">${existingAttachment ? `${formatPostFileSize(existingAttachment.size)} · 已保留原附件` : '限 1 份，最大 50MB；支持 PDF、Office、TXT、压缩包、JPG/PNG'}</small></div><button type="button" id="new-post-attachment-remove" class="post-attachment-remove" title="移除附件" onclick="AppPrototype.clearPostAttachment()" ${existingAttachment ? '' : 'hidden'}>${icon('x')}</button></div></div><fieldset class="post-publish-settings"><legend>发布设置</legend><div class="post-identity-options"><label class="post-identity-option"><input type="radio" name="new-post-identity" value="real" ${identity === 'real' ? 'checked' : ''}><span>实名发布</span></label><label class="post-identity-option"><input type="radio" name="new-post-identity" value="anonymous" ${identity === 'anonymous' ? 'checked' : ''}><span>匿名发布</span></label></div><div class="post-setting-divider"></div><label class="post-comment-toggle"><span><strong>允许评论</strong><small id="new-post-comment-hint">${editingPost?.board ? '栏目关闭评论时此处不可开启。' : '请先选择栏目；栏目关闭评论时此处不可开启。'}</small></span><input id="new-post-allow-comments" type="checkbox" role="switch" ${commentsEnabled && editingPost?.allowComments !== false ? 'checked' : ''} ${!commentsEnabled ? 'disabled' : ''}><i aria-hidden="true"><b></b></i></label></fieldset><p id="post-compose-error" class="post-compose-error" role="alert" hidden></p></div><footer class="post-compose-actions"><button type="button" onclick="AppPrototype.closePostComposer()">取消</button><button type="button" onclick="AppPrototype.savePostDraft()">保存草稿</button><button type="button" class="primary" onclick="AppPrototype.submitPost()">提交</button></footer>${renderDraftBox()}</section></div>`;
 }
 function renderHomeContent() {
   if (state.homeContentTab === '精华贴') {
@@ -517,7 +550,7 @@ function renderHomeNotices() {
   const notices = sortedHomeNotices();
   const visible = notices.length > 5 ? Array.from({ length: 5 }, (_, index) => notices[(state.noticeCarouselIndex + index) % notices.length]) : notices;
   const unreadCount = notices.filter((notice) => !state.noticeRead[notice.id]).length;
-  return `<section class="portal-panel notice-panel"><header class="portal-panel-head"><h2>${icon('megaphone')} 通知公告${unreadCount ? `<small class="utility-count">${unreadCount} 未读</small>` : ''}</h2><button type="button" onclick="AppPrototype.setWorkspaceView('notices')">更多 ${icon('arrow-right')}</button></header>${visible.map((notice) => { const unread = !state.noticeRead[notice.id]; return `<button class="notice-item ${unread ? 'unread' : 'read'}" type="button" onclick="AppPrototype.showHomeNotice('${notice.id}')"><div class="utility-item-title">${unread ? '<i class="utility-unread-dot" aria-label="未读"></i>' : ''}<strong>${escapeHtml(notice.title)}</strong></div><span>${escapeHtml(notice.meta)}</span></button>`; }).join('')}</section>`;
+  return `<section class="portal-panel notice-panel"><header class="portal-panel-head"><h2>${icon('megaphone')} 通知公告${unreadCount ? `<small class="utility-count">${notices.length} 条</small>` : ''}</h2><button type="button" onclick="AppPrototype.setWorkspaceView('notices')">更多 ${icon('arrow-right')}</button></header>${visible.map((notice) => { const unread = !state.noticeRead[notice.id]; return `<button class="notice-item ${unread ? 'unread' : 'read'}" type="button" onclick="AppPrototype.showHomeNotice('${notice.id}')"><div class="utility-item-title">${unread ? '<i class="utility-unread-dot" aria-label="未读"></i>' : ''}<strong>${escapeHtml(notice.title)}</strong></div><span>${escapeHtml(notice.meta)}</span></button>`; }).join('')}</section>`;
 }
 function renderHomeAffairs() {
   const data = PrototypeData.read();
@@ -526,8 +559,8 @@ function renderHomeAffairs() {
   const unread = unreadStaffReplies(data);
   const { seen } = staffProgressSeen(data, posts);
   const needsReview = posts.filter((post) => seen[post.id] !== progressSignature(staffPostProgress(post, data)) || unread.some((item) => String(item.postId) === String(post.id)));
-  const visible = needsReview.slice(0, 10);
-  return `<section class="portal-panel my-affairs-panel"><header class="portal-panel-head"><h2>${icon('route')} 我的进度${needsReview.length ? `<small class="utility-count">${needsReview.length} 更新</small>` : ''}</h2><button type="button" onclick="AppPrototype.openProgressList()">查看全部 ${icon('arrow-right')}</button></header><div class="affair-review-list" aria-label="待查看的进度更新">${visible.map((post) => { const progress = staffPostProgress(post, data); const update = unread.find((item) => String(item.postId) === String(post.id)); return `<button class="affair-item updated" type="button" onclick="AppPrototype.openPostProgress('${escapeHtml(post.id)}')"><div><div class="utility-item-title"><i class="utility-unread-dot" aria-label="有更新"></i><strong>${escapeHtml(post.title)}</strong></div><span>${escapeHtml(update?.node || progress.label)} · ${escapeHtml(update?.message || progress.detail)}</span></div><em class="progress-status ${progress.tone}">${escapeHtml(staffListStatusLabel(post, progress))}</em></button>`; }).join('') || '<p class="progress-empty">暂无待查看的进度更新</p>'}</div>${needsReview.length > 10 ? `<div class="affair-review-foot">还有 ${needsReview.length - 10} 条，请查看全部</div>` : ''}</section>`;
+  const visible = posts.slice(0, Math.max(0, 6 - staffDrafts().length));
+  return `<section class="portal-panel my-affairs-panel"><header class="portal-panel-head"><h2>${icon('file-text')} 我的发言${needsReview.length ? `<small class="utility-count">${posts.length + staffDrafts().length} 条</small>` : ''}</h2><button type="button" onclick="AppPrototype.setWorkspaceView('profile')">查看全部 ${icon('arrow-right')}</button></header><div class="affair-review-list" aria-label="我的发言">${staffDrafts().slice(0, 6).map((draft) => `<button class="affair-item" type="button" onclick="AppPrototype.editStaffDraft('${draft.id}')"><div><strong>${escapeHtml(draft.title || '未命名草稿')}</strong><span>${escapeHtml(draft.board || '未选择栏目')}</span></div><em class="progress-status pending">草稿</em></button>`).join('')}${visible.map((post) => { const progress = staffPostProgress(post, data); const update = unread.find((item) => String(item.postId) === String(post.id)); return `<button class="affair-item updated" type="button" onclick="AppPrototype.openPostProgress('${escapeHtml(post.id)}')"><div><div class="utility-item-title"><i class="utility-unread-dot" aria-label="有更新"></i><strong>${escapeHtml(post.title)}</strong></div><span>${escapeHtml(update?.node || progress.label)} · ${escapeHtml(update?.message || progress.detail)}</span></div><em class="progress-status ${progress.tone}">${escapeHtml(staffListStatusLabel(post, progress))}</em></button>`; }).join('') || '<p class="progress-empty">暂无待查看的发言</p>'}</div>${posts.length > 6 ? `<button type="button" class="affair-review-foot" onclick="AppPrototype.setWorkspaceView('profile')">还有 ${posts.length - 6} 条，请查看全部</button>` : ''}</section>`;
 }
 function activeManagedBanners(data = PrototypeData.read()) {
   return (data.banners || []).filter((item) => {
@@ -546,7 +579,7 @@ function renderStaffPortal() {
   const managedBanners = activeManagedBanners();
   const banners = managedBanners.length ? managedBanners.map((item) => ({ ...item, tag: '湖北供销 · 心声' })) : policyBanners;
   const banner = banners[state.bannerIndex % banners.length];
-  return `<div class="page-head portal-head"><div><div class="page-kicker">职工协同</div><h1>综合门户</h1><p>政策宣传、交流内容与个人进度的集中入口</p></div><span class="date">2026 年 09 月 10 日 · 星期四</span></div>
+  return `<div class="page-head portal-head"><div><div class="page-kicker">湖北供销 · 心声</div><h1>首页</h1><p>查看职工交流动态、通知公告和我的发言</p></div><button class="staff-home-compose" type="button" onclick="AppPrototype.openPostComposer()">${icon('square-pen')}<span>我要发言</span></button></div>
     <section class="portal-grid staff-home-grid">
       <div class="portal-content-column">
         <section class="policy-carousel" style="background-image:linear-gradient(90deg, rgba(25,30,31,.64), rgba(25,30,31,.12)), url('${escapeHtml(banner.image)}')">
@@ -566,7 +599,7 @@ function renderSupplyVoice() {
   return `<div class="supply-voice-page">
     <div class="page-head portal-head"><div><div class="page-kicker">职工协同</div><h1>供销心声</h1><p>汇集职工建言、诉求、业务经验与办理回音</p></div><span class="date">2026 年 09 月 10 日 · 星期四</span></div>
     <section class="portal-grid supply-voice-grid">
-      <div class="portal-main-column">${renderPortalTabs()}${renderPortalFeed()}</div>
+      <div class="portal-main-column">${renderPortalTabs()}<form class="staff-voice-tools" onsubmit="event.preventDefault();AppPrototype.searchVoices()"><div>${icon('search')}<input id="voice-search" placeholder="搜索论坛帖子、建议或回音..." value="${escapeHtml(state.voiceSearch)}"></div><button type="submit">${icon('search')} 搜索</button><button type="button" onclick="AppPrototype.refreshVoices()">${icon('refresh-cw')} 刷新</button><button type="button" class="primary" onclick="AppPrototype.openPostComposer()">${icon('pencil-line')} 我要发帖</button></form>${renderPortalFeed({ title: '内容动态' })}</div>
       <aside class="portal-side-column">${renderRankingPanel('discussion')}${renderRankingPanel('progress')}</aside>
     </section>
   </div>`;
@@ -627,11 +660,138 @@ function renderPolicyPage() {
     </section>
   </div>`;
 }
+/* 消息中心：官方回复、业务通知、通知公告；评论/点赞/举报统一在个人中心查看 */
+const MESSAGE_TABS = ['官方回复', '业务通知', '通知公告'];
+/* 消息中心已读状态：三个页签共用同一份按账号隔离的 localStorage 记录，读取失败时退回内存态 */
+const MESSAGE_READ_GROUPS = ['notices', 'interactions', 'replies'];
+function messageReadKey(userId) { return `prototype-message-read-${userId || state.session?.id || 'staff'}`; }
+function loadMessageReadState(userId) {
+  const loaded = { notices: {}, interactions: {}, replies: {} };
+  try {
+    const raw = JSON.parse(localStorage.getItem(messageReadKey(userId)) || '{}');
+    if (raw && typeof raw === 'object') for (const group of MESSAGE_READ_GROUPS) if (raw[group] && typeof raw[group] === 'object' && !Array.isArray(raw[group])) loaded[group] = raw[group];
+  } catch (_) { /* localStorage 不可用或数据损坏：保持空态，不阻断渲染 */ }
+  return loaded;
+}
+function saveMessageReadState(userId) {
+  try { localStorage.setItem(messageReadKey(userId), JSON.stringify({ notices: state.noticeRead || {}, interactions: state.interactionRead || {}, replies: state.replyRead || {} })); } catch (_) { /* 写入失败仅影响刷新后的恢复，不影响当前会话 */ }
+}
+function hasMessageReadStore(userId) {
+  try { return Boolean(localStorage.getItem(messageReadKey(userId))); } catch (_) { return false; }
+}
+/* 首次（无任何持久化记录）以预置已读为缺省，已有持久化时一律以持久化为准 */
+function applyMessageReadState(userId) {
+  const loaded = loadMessageReadState(userId);
+  state.noticeRead = loaded.notices;
+  state.interactionRead = loaded.interactions;
+  state.replyRead = loaded.replies;
+  if (!hasMessageReadStore(userId)) {
+    Object.assign(state.interactionRead, INTERACTION_READ_PRESET);
+    saveMessageReadState(userId);
+  }
+}
+function noticeUnreadCount() { return homeNotices.filter((notice) => !state.noticeRead[notice.id]).length; }
+function interactionUnreadCount() { return personalInteractions.filter((_, index) => !state.interactionRead[index]).length; }
+function businessNotificationItems() {
+  if (!state.session) return [];
+  const data = PrototypeData.read();
+  const authorId = state.session.id || 'staff';
+  return (data.staffNotifications || []).filter((item) => String(item.authorId) === String(authorId)).map((item) => ({
+    ...item,
+    title: item.postTitle || item.text?.split('：')[0] || '事项办理通知',
+    content: item.message || item.text || '有新的业务处理进展，请及时查看。',
+    detail: item.at || '时间未记录',
+    read: Boolean(item.readAt)
+  }));
+}
+function businessNotificationUnreadCount() { return businessNotificationItems().filter((item) => !item.read).length; }
+/* 互动列表 20 条演示记录保留，前 14 条预置为已读，使侧栏徽标回落到合理量级 */
+const INTERACTION_READ_PRESET = Object.fromEntries(personalInteractions.slice(0, 14).map((_, index) => [index, true]));
+/* 官方回复时间统一为与通知公告一致的 MM-DD 口径，无法解析时给出稳定回落值 */
+const REPLY_DATE_FALLBACK = '--';
+function replyDateLabel(value) {
+  const text = String(value || '').trim();
+  if (!text) return REPLY_DATE_FALLBACK;
+  const full = text.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if (full) return `${full[2].padStart(2, '0')}-${full[3].padStart(2, '0')}`;
+  const short = text.match(/(\d{1,2})\D+(\d{1,2})/);
+  if (short) return `${short[1].padStart(2, '0')}-${short[2].padStart(2, '0')}`;
+  return REPLY_DATE_FALLBACK;
+}
+/* 官方回复：入列依据只有「事项办理状态为已回复」；staffNotifications 仅补充时间、摘要与未读数，不得单独造成一条记录入列 */
+function officialReplyItems() {
+  if (!state.session) return [];
+  const data = PrototypeData.read();
+  const posts = ownedStaffPosts(data);
+  const authorId = state.session.id || 'staff';
+  const notifications = (data.staffNotifications || []).filter((item) => String(item.authorId) === String(authorId));
+  const items = [];
+  for (const post of posts) {
+    const progress = staffPostProgress(post, data);
+    if (progress.label !== '已回复') continue;
+    const affair = progress.affair || {};
+    const postId = String(post.id);
+    const related = notifications.filter((item) => String(item.postId) === postId);
+    const unreadNotifications = related.filter((item) => !item.readAt).length;
+    const lastEvent = progress.events.length ? progress.events[progress.events.length - 1] : null;
+    const serverRead = related.length > 0 && unreadNotifications === 0;
+    const read = Boolean(state.replyRead[postId]) || serverRead;
+    items.push({
+      postId,
+      post,
+      title: post.title,
+      summary: String(affair.draft || '').trim() || '工作人员已完成办理并发送正式回复。',
+      publicReply: affair.feedback === '公开答复',
+      at: replyDateLabel(affair.repliedAt || lastEvent?.at || related[0]?.at || post.time),
+      notificationCount: related.length,
+      unreadNotifications,
+      read,
+      unread: !read
+    });
+  }
+  return items;
+}
+function replyUnreadCount() { return officialReplyItems().filter((item) => item.unread).length; }
+function messageTabUnread(tab) {
+  if (tab === '官方回复') return replyUnreadCount();
+  if (tab === '业务通知') return businessNotificationUnreadCount();
+  return noticeUnreadCount();
+}
+function messageUnreadTotal() { return unifiedNoticeItems().filter((item) => !item.read).length; }
+function activeMessageTab() { return MESSAGE_TABS.includes(state.messageTab) ? state.messageTab : MESSAGE_TABS[0]; }
+function renderMessageTabs() {
+  const active = activeMessageTab();
+  return `<nav class="message-tabs" aria-label="消息中心分类">${MESSAGE_TABS.map((tab) => { const unread = messageTabUnread(tab); return `<button type="button" class="message-tab ${active === tab ? 'active' : ''}" aria-current="${active === tab ? 'page' : 'false'}" onclick="AppPrototype.setMessageTab('${tab}')">${tab}${unread ? `<span class="message-tab-badge">${unread}</span>` : ''}</button>`; }).join('')}</nav>`;
+}
+function renderInteractionMessages() {
+  const unreadCount = interactionUnreadCount();
+  const replies = officialReplyItems();
+  const totalUnread = unreadCount + replies.filter((item) => item.unread).length;
+  const interactionRows = personalInteractions.map((item, index) => { const read = Boolean(state.interactionRead[index]); return `<article class="message-item ${read ? 'read' : 'unread'}"><span class="message-item-icon">${icon(item.icon || 'message-circle')}</span><div class="message-item-main"><div class="message-item-meta"><span class="message-item-type">${escapeHtml(item.type)}</span><small>${escapeHtml(item.detail)}</small></div><h3>${escapeHtml(item.title)}${read ? '' : '<i class="message-unread-dot" aria-label="未读"></i>'}</h3><p>${escapeHtml(item.content)}</p></div><div class="message-item-actions"><button type="button" class="primary" onclick="AppPrototype.readInteraction(${index})">查看</button></div></article>`; });
+  const replyRows = replies.map((item) => `<article class="message-item ${item.read ? 'read' : 'unread'}"><span class="message-item-icon">${icon('messages-square')}</span><div class="message-item-main"><div class="message-item-meta"><span class="message-item-type">官方回复</span><small>${escapeHtml(item.at || '时间未记录')}</small></div><h3>${escapeHtml(item.title)}${item.unread ? '<i class="message-unread-dot" aria-label="未读"></i>' : ''}</h3><p>${escapeHtml(item.summary)}</p><div class="message-item-note"><span class="message-item-scope ${item.publicReply ? 'public' : 'private'}">${item.publicReply ? '公开答复' : '仅本人可见'}</span></div></div><div class="message-item-actions"><button type="button" class="primary" onclick="AppPrototype.readReply('${escapeHtml(item.postId)}')">查看</button></div></article>`);
+  return `<section class="message-section"><header class="message-section-head"><div><span class="message-section-mark"></span><div><h2>互动消息</h2><p>评论、点赞、举报与官方回复集中查看</p></div></div><div class="message-section-actions"><span class="message-unread-count ${totalUnread ? 'has-unread' : ''}">${totalUnread ? `${totalUnread} 条未读` : '全部已读'}</span><button type="button" onclick="AppPrototype.markAllInteractionsRead(); AppPrototype.markAllRepliesRead();">全部标记已读</button></div></header><div class="message-list">${interactionRows.concat(replyRows).join('') || '<p class="message-empty">暂无互动消息</p>'}</div><footer class="message-foot">共 ${interactionRows.length + replyRows.length} 条互动记录</footer></section>`;
+}
+function renderBusinessNotifications() {
+  const items = businessNotificationItems();
+  const unreadCount = businessNotificationUnreadCount();
+  return `<section class="message-section"><header class="message-section-head"><div><span class="message-section-mark"></span><div><h2>业务通知</h2><p>事项进展、审核结果与办理节点提醒</p></div></div><div class="message-section-actions"><span class="message-unread-count ${unreadCount ? 'has-unread' : ''}">${unreadCount ? `${unreadCount} 条未读` : '全部已读'}</span></div></header><div class="message-list">${items.length ? items.map((item) => `<article class="message-item ${item.read ? 'read' : 'unread'}"><span class="message-item-icon">${icon('bell-ring')}</span><div class="message-item-main"><div class="message-item-meta"><span class="message-item-type">业务通知</span><small>${escapeHtml(item.detail)}</small></div><h3>${escapeHtml(item.title)}${item.read ? '' : '<i class="message-unread-dot" aria-label="未读"></i>'}</h3><p>${escapeHtml(item.content)}</p></div><div class="message-item-actions"><button type="button" class="primary" onclick="AppPrototype.openPostProgress('${escapeHtml(item.postId || '')}')">查看</button></div></article>`).join('') : '<p class="message-empty">暂无业务通知</p>'}</div><footer class="message-foot">共 ${items.length} 条业务通知</footer></section>`;
+}
+function renderOfficialReplyMessages() {
+  const items = officialReplyItems();
+  const chats = PrivateChat.items(state.session?.id).map((thread) => {
+    const post = PrototypeData.read().posts.find((p) => String(p.id) === thread.postId);
+    const last = thread.messages[thread.messages.length - 1];
+    return `<article class="message-item"><div class="message-item-main"><div class="message-item-meta"><span>私聊</span><small>${escapeHtml(last?.at)}</small></div><h3>${escapeHtml(post?.title || '原帖私聊')}</h3><p>${escapeHtml(last?.text)}</p></div><div class="message-item-actions"><button class="primary" onclick="AppPrototype.openPrivateChat('${escapeHtml(thread.postId)}')">查看私聊${thread.messages.some((m) => m.role !== 'staff' && !m.read) ? ' · 未读' : ''}</button></div></article>`;
+  }).join('');
+  if (chats) return `<section class="message-section"><header class="message-section-head"><p>本人发言收到的办理答复与私密沟通</p></header><div class="message-list">${chats}${items.map((item) => `<article class="message-item"><div class="message-item-main"><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.summary)}</p></div><button onclick="AppPrototype.readReply('${escapeHtml(item.postId)}')">查看回复</button></article>`).join('')}</div></section>`;
+  const unreadCount = replyUnreadCount();
+  return `<section class="message-section"><header class="message-section-head"><div><span class="message-section-mark"></span><div><h2>官方回复</h2><p>本人发言收到的办理答复</p></div></div><div class="message-section-actions"><span class="message-unread-count ${unreadCount ? 'has-unread' : ''}">${unreadCount ? `${unreadCount} 条未读` : '全部已读'}</span><button type="button" onclick="AppPrototype.markAllRepliesRead()">全部标记已读</button></div></header><div class="message-list">${items.length ? items.map((item) => `<article class="message-item ${item.read ? 'read' : 'unread'}"><span class="message-item-icon">${icon('messages-square')}</span><div class="message-item-main"><div class="message-item-meta"><span class="message-item-type">官方回复</span><small>${escapeHtml(item.at || '时间未记录')}</small></div><h3>${escapeHtml(item.title)}${item.unread ? '<i class="message-unread-dot" aria-label="未读"></i>' : ''}</h3><p>${escapeHtml(item.summary)}</p></div><div class="message-item-actions"><button type="button" class="primary" onclick="AppPrototype.readReply('${escapeHtml(item.postId)}')">查看回复</button></div></article>`).join('') : '<p class="message-empty">暂无官方回复</p>'}</div><footer class="message-foot">共 ${items.length} 条办理答复</footer></section>`;
+}
 function renderPolicyNotices() {
-  const unreadCount = homeNotices.filter((notice) => !state.noticeRead[notice.id]).length;
+  const unreadCount = noticeUnreadCount();
   const noticeTabs = ['全部', '未读', '已读'];
   const notices = homeNotices.filter((notice) => state.noticeTab === '全部' || Boolean(state.noticeRead[notice.id]) === (state.noticeTab === '已读'));
-  return `<section class="knowledge-section knowledge-notice-section"><header class="knowledge-notice-head"><div><span class="knowledge-section-mark"></span><div><h2>通知公告</h2><p>及时查看平台规则、服务说明和工作提示</p></div></div><div class="knowledge-notice-head-actions"><span class="knowledge-notice-count">${unreadCount ? `${unreadCount} 条未读` : '全部已读'}</span><button type="button" onclick="AppPrototype.markAllNoticesRead()">全部标记已读</button></div></header><nav class="knowledge-notice-tabs" aria-label="通知公告阅读状态">${noticeTabs.map((label) => `<button type="button" class="${state.noticeTab === label ? 'active' : ''}" onclick="AppPrototype.setNoticeTab('${label}')">${label}${label === '未读' && unreadCount ? ` <b>${unreadCount}</b>` : ''}</button>`).join('')}</nav><div class="knowledge-notice-list">${notices.length ? notices.map((notice) => { const read = Boolean(state.noticeRead[notice.id]); return `<article class="knowledge-notice-item ${read ? 'read' : 'unread'}"><div class="knowledge-notice-item-top"><span class="knowledge-notice-kind">${icon('megaphone')} 通知公告</span><small>${escapeHtml(notice.meta)}</small></div><h3>${escapeHtml(notice.title)}${read ? '' : '<i class="knowledge-notice-unread-dot" aria-label="未读"></i>'}</h3><p>${escapeHtml(notice.summary)}</p><div class="knowledge-notice-actions">${read ? '' : `<button type="button" onclick="AppPrototype.readNotice('${notice.id}')">我已知悉</button>`}<button type="button" class="primary" onclick="AppPrototype.openNotice('${notice.id}')">立即查看 ${icon('arrow-right')}</button></div></article>`; }).join('') : `<p class="knowledge-notice-empty">${state.noticeTab === '未读' ? '暂无未读通知。' : '暂无已读通知。'}</p>`}</div><footer class="knowledge-notice-foot">${unreadCount ? '还有未读通知，请及时查看。' : '已全部读完'}</footer></section>`;
+  return `<section class="knowledge-section knowledge-notice-section"><header class="knowledge-notice-head"><div><span class="knowledge-section-mark"></span><div><h2>公告清单</h2><p>平台规则、服务说明和工作提示</p></div></div><div class="knowledge-notice-head-actions"><span class="knowledge-notice-count">${unreadCount ? `${unreadCount} 条未读` : '全部已读'}</span><button type="button" onclick="AppPrototype.markAllNoticesRead()">全部标记已读</button></div></header><div class="knowledge-notice-list">${notices.length ? notices.map((notice) => { const read = Boolean(state.noticeRead[notice.id]); return `<article class="knowledge-notice-item ${read ? 'read' : 'unread'}"><div class="knowledge-notice-item-top"><span class="knowledge-notice-kind">${icon('megaphone')} 通知公告</span><small>${escapeHtml(notice.meta)}</small></div><h3>${escapeHtml(notice.title)}${read ? '' : '<i class="knowledge-notice-unread-dot" aria-label="未读"></i>'}</h3><p>${escapeHtml(notice.summary)}</p><div class="knowledge-notice-actions">${read ? '' : `<button type="button" onclick="AppPrototype.readNotice('${notice.id}')">我已知悉</button>`}<button type="button" class="primary" onclick="AppPrototype.openNotice('${notice.id}')">立即查看 ${icon('arrow-right')}</button></div></article>`; }).join('') : '<p class="knowledge-notice-empty">暂无通知公告。</p>'}</div><footer class="knowledge-notice-foot">${unreadCount ? '还有未读通知，请及时查看。' : '已全部读完'}</footer></section>`;
 }
 function noticeAttachment(notice) {
   const file = notice?.attachment;
@@ -649,7 +809,7 @@ function renderNoticeDetailModal() {
   if (!state.noticeDetailId || state.staffDisplayMode === 'mobile') return '';
   const notice = homeNotices.find((item) => item.id === state.noticeDetailId);
   if (!notice) return '';
-  return `<div class="ranking-backdrop" onclick="AppPrototype.closeNoticeDetail(event)"><section class="ranking-modal knowledge-modal" role="dialog" aria-modal="true" aria-labelledby="notice-detail-title"><header class="ranking-modal-head"><div><span>通知公告</span><h2 id="notice-detail-title">${escapeHtml(notice.title)}</h2><p>${escapeHtml(notice.meta)}</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeNoticeDetail()">${icon('x')}</button></header><div class="knowledge-modal-body">${renderNoticeDetailBody(notice)}</div></section></div>`;
+  return `<div class="ranking-backdrop" onclick="AppPrototype.closeNoticeDetail(event)"><section class="ranking-modal knowledge-modal" role="dialog" aria-modal="true" aria-labelledby="notice-detail-title"><header class="ranking-modal-head"><div><span>${state.workspaceView === 'notices' ? '消息中心 · 通知公告' : '通知公告'}</span><h2 id="notice-detail-title">${escapeHtml(notice.title)}</h2><p>${escapeHtml(notice.meta)}</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeNoticeDetail()">${icon('x')}</button></header><div class="knowledge-modal-body">${renderNoticeDetailBody(notice)}</div><footer class="ranking-modal-foot"><button type="button" class="primary" onclick="AppPrototype.closeNoticeDetail()">关闭</button></footer></section></div>`;
 }
 function noticeFileUrl(file) {
   if (typeof file.content === 'string') return URL.createObjectURL(new Blob([file.content], { type: 'text/plain;charset=utf-8' }));
@@ -670,7 +830,7 @@ function openNoticeFile(id, download) {
   link.remove();
   if (typeof file.content === 'string') setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
-function renderAffairProgressModal() {
+function renderOriginalAffairProgressModal() {
   if (state.personalProgressId === null) return '';
   const data = PrototypeData.read();
   const post = ownedStaffPosts(data).find((item) => String(item.id) === String(state.personalProgressId));
@@ -707,16 +867,43 @@ function renderAffairProgressModal() {
   const publishLabel = post.publishStatus === '已发布' || publicationPublished ? '已发布' : '未发布';
   const handlingLabel = affair ? progress.label : '不适用';
   const publicationLog = [...progress.events].reverse().map((event) => `<article class="progress-operation-entry"><time>${escapeHtml(event.at || '时间未记录')}</time><strong>${escapeHtml(event.text)}</strong><small>操作人：${escapeHtml(event.actor || (event.text === '已提交发言' ? `${post.author || state.session?.name || '职工'}（提交人）` : '王敏（内容审核人员）'))}</small></article>`).join('');
-  return `<div class="ranking-backdrop" onclick="AppPrototype.closeAffairProgress(event)"><section class="ranking-modal affair-progress-modal" role="dialog" aria-modal="true" aria-labelledby="affair-progress-title"><header class="ranking-modal-head"><div><span>个人发言 · 进度详情</span><h2 id="affair-progress-title">${escapeHtml(post.title)}</h2><p>${escapeHtml(meta)}</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeAffairProgress()">${icon('x')}</button></header><div class="affair-progress-body"><section class="progress-post-detail"><span class="progress-section-label">发帖信息</span><div class="progress-post-meta"><b>${escapeHtml(post.board)}</b><span>${escapeHtml(post.author || state.session?.name || '职工')} · ${escapeHtml(post.time || '')}</span></div><h3>${escapeHtml(post.title)}</h3>${post.subtitle ? `<h4>${escapeHtml(post.subtitle)}</h4>` : ''}<p>${escapeHtml(post.body || post.excerpt || '')}</p>${post.media ? `<div class="progress-post-media">${icon('image')} <span>包含关联图片：${escapeHtml(post.media.alt || '帖子图片')}</span></div>` : ''}</section><section class="progress-flow-detail"><div class="progress-status-block"><div class="progress-status-block-head"><div><span class="progress-status-caption">当前发布结果</span><strong class="progress-status ${publicationTone}" title="帖子已通过审核，对外公开展示">${publicationLabel}</strong></div></div><h3 class="progress-log-title">操作记录</h3><div class="progress-operation-log">${publicationLog || '<p class="progress-log-empty">暂无操作记录</p>'}</div></div></section></div><footer class="ranking-modal-foot">${progress.canResubmit ? `<button type="button" class="personal-progress-edit" onclick="AppPrototype.editRejectedPost('${escapeHtml(post.id)}')">修改后重新提交</button>` : ''}<button type="button" class="personal-progress-close" onclick="AppPrototype.closeAffairProgress()">关闭</button></footer></section></div>`;
+  const officialReply = progress.label === '已回复' ? `<section class="official-reply-block"><div class="official-reply-block-head"><div><span class="progress-section-label">官方回复</span><h3>办理答复</h3></div><span class="message-item-scope ${affair?.feedback === '公开答复' ? 'public' : 'private'}">${affair?.feedback === '公开答复' ? '公开答复' : '仅本人可见'}</span></div><p>${escapeHtml(String(affair?.draft || '').trim() || '工作人员已完成办理并发送正式回复。')}</p><div class="official-reply-compose"><label for="progress-reply-${escapeHtml(post.id)}">继续追问</label><textarea id="progress-reply-${escapeHtml(post.id)}" placeholder="针对办理答复继续补充问题或说明"></textarea><button type="button" class="primary" onclick="AppPrototype.submitProgressReply('${escapeHtml(post.id)}')">提交追问</button></div></section>` : '';
+  return `<div class="ranking-backdrop" onclick="AppPrototype.closeAffairProgress(event)"><section class="ranking-modal affair-progress-modal" role="dialog" aria-modal="true" aria-labelledby="affair-progress-title"><header class="ranking-modal-head"><div><span>${state.workspaceView === 'notices' ? '消息中心 · 官方回复' : '个人发言 · 进度详情'}</span><h2 id="affair-progress-title">${escapeHtml(post.title)}</h2><p>${escapeHtml(meta)}</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeAffairProgress()">${icon('x')}</button></header><div class="affair-progress-body"><section class="progress-post-detail"><span class="progress-section-label">发帖信息</span><div class="progress-post-meta"><b>${escapeHtml(post.board)}</b><span>${escapeHtml(post.author || state.session?.name || '职工')} · ${escapeHtml(post.time || '')}</span></div><h3>${escapeHtml(post.title)}</h3>${post.subtitle ? `<h4>${escapeHtml(post.subtitle)}</h4>` : ''}<p>${escapeHtml(post.body || post.excerpt || '')}</p>${post.media ? `<div class="progress-post-media">${icon('image')} <span>包含关联图片：${escapeHtml(post.media.alt || '帖子图片')}</span></div>` : ''}</section><section class="progress-flow-detail"><div class="progress-status-block"><div class="progress-status-block-head"><div><span class="progress-status-caption">当前发布结果</span><strong class="progress-status ${publicationTone}" title="帖子已通过审核，对外公开展示">${publicationLabel}</strong></div></div><h3 class="progress-log-title">操作记录</h3><div class="progress-operation-log">${publicationLog || '<p class="progress-log-empty">暂无操作记录</p>'}</div></div></section></div><footer class="ranking-modal-foot">${progress.canResubmit ? `<button type="button" class="personal-progress-edit" onclick="AppPrototype.editRejectedPost('${escapeHtml(post.id)}')">修改后重新提交</button>` : ''}<button type="button" class="personal-progress-close" onclick="AppPrototype.closeAffairProgress()">关闭</button></footer></section></div>`;
+}
+/* 进度弹窗的答复区覆盖实现：官方回复与追问放在同一上下文中。 */
+function renderAffairProgressModal() {
+  if (state.personalProgressId === null) return '';
+  const data = PrototypeData.read();
+  const post = ownedStaffPosts(data).find((item) => String(item.id) === String(state.personalProgressId));
+  if (!post) return '';
+  const progress = staffPostProgress(post, data);
+  const affair = progress.affair || {};
+  const reply = String(affair.draft || '').trim() || '工作人员已完成办理并发送正式回复。';
+  if (progress.label !== '已回复') return renderOriginalAffairProgressModal();
+  const messages = PrivateChat.items(state.session.id).find((t) => t.postId === String(post.id))?.messages || [];
+  const published = post.publishStatus ? post.publishStatus === '已发布' : PrototypeData.isPublicPost(post);
+return `<div class="ranking-backdrop" onclick="AppPrototype.closeAffairProgress(event)"><section class="ranking-modal affair-progress-modal" role="dialog" aria-modal="true"><header class="ranking-modal-head"><div><span>消息中心 · 官方回复</span><h2>${escapeHtml(post.title)}</h2><p>${escapeHtml(affair.id || '')} · ${escapeHtml(affair.category || post.board || '')}</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeAffairProgress()">${icon('x')}</button></header><div class="affair-progress-body"><section class="progress-post-detail"><span class="progress-section-label">发帖信息</span><h3>${escapeHtml(post.title)}</h3><p>${escapeHtml(post.body || post.excerpt || '')}</p><div class="progress-status-block"><h3 class="progress-log-title">发布状态</h3><strong class="progress-status ${published ? 'done' : ''}">${published ? '已发布' : '未发布'}</strong></div></section><section class="progress-flow-detail"><section class="official-reply-block"><div class="official-reply-block-head"><span class="progress-section-label">官方回复</span></div><div class="official-reply-history">${[{ role: 'admin', text: reply, at: affair.repliedAt || '' }, ...messages].map((m) => `<article data-message-id="${escapeHtml(m.id || 'official-reply')}"><small>${m.role === 'staff' ? '我' : '管理人员'}${m.at ? ` · ${escapeHtml(m.at)}` : ''}</small><p>${escapeHtml(m.text)}</p>${PrivateChat.quoteHtml(m.quote)}<button type="button" class="official-reply-expand" data-sender="${m.role === 'staff' ? '我' : '管理人员'}" aria-expanded="false" onclick="AppPrototype.expandMessageReply(this)">回复</button></article>`).join('')}</div><div class="official-reply-compose message-inline-compose" hidden><textarea id="progress-reply-${escapeHtml(post.id)}" maxlength="2000" placeholder="请输入回复内容"></textarea><div class="message-inline-actions"><button type="button" onclick="AppPrototype.cancelMessageReply(this)">取消</button><button type="button" class="primary" onclick="AppPrototype.submitProgressReply('${escapeHtml(post.id)}')">发布</button></div></div></section></section></div><footer class="ranking-modal-foot"><button type="button" class="personal-progress-close" onclick="AppPrototype.closeAffairProgress()">关闭</button></footer></section></div>`;
 }
 function renderProgressListModal() {
   if (!state.progressListOpen) return '';
   const data = PrototypeData.read();
   const posts = ownedStaffPosts(data);
-  return `<div class="ranking-backdrop" onclick="AppPrototype.closeProgressList(event)"><section class="ranking-modal progress-list-modal" role="dialog" aria-modal="true" aria-labelledby="progress-list-title"><header class="ranking-modal-head"><div><span>个人进度</span><h2 id="progress-list-title">我的进度</h2><p>查看本人发言的处理和回复状态</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeProgressList()">${icon('x')}</button></header><div class="progress-modal-list">${posts.map((post) => { const progress = staffPostProgress(post, data); return `<button type="button" onclick="AppPrototype.openPostProgress('${escapeHtml(post.id)}')"><span><b>${escapeHtml(post.board)}</b><strong>${escapeHtml(post.title)}</strong><small>${escapeHtml(progress.detail)}</small></span><em class="progress-status ${progress.tone}">${escapeHtml(staffListStatusLabel(post, progress))}</em>${icon('chevron-right')}</button>`; }).join('') || '<p class="progress-empty">暂无发言进度</p>'}</div><footer class="ranking-modal-foot">共 ${posts.length} 条</footer></section></div>`;
+  return `<div class="ranking-backdrop" onclick="AppPrototype.closeProgressList(event)"><section class="ranking-modal progress-list-modal" role="dialog" aria-modal="true" aria-labelledby="progress-list-title"><header class="ranking-modal-head"><div><span>个人中心</span><h2 id="progress-list-title">我的发言</h2><p>查看本人发言的处理和回复状态</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeProgressList()">${icon('x')}</button></header><div class="progress-modal-list">${posts.map((post) => { const progress = staffPostProgress(post, data); return `<button type="button" onclick="AppPrototype.openPostProgress('${escapeHtml(post.id)}')"><span><b>${escapeHtml(post.board)}</b><strong>${escapeHtml(post.title)}</strong><small>${escapeHtml(progress.detail)}</small></span><em class="progress-status ${progress.tone}">${escapeHtml(staffListStatusLabel(post, progress))}</em>${icon('chevron-right')}</button>`; }).join('') || '<p class="progress-empty">暂无发言进度</p>'}</div><footer class="ranking-modal-foot">共 ${posts.length} 条</footer></section></div>`;
+}
+function unifiedNoticeItems() {
+  const business = businessNotificationItems().map((item) => ({ ...item, kind: 'business', type: '业务通知' }));
+  const replies = officialReplyItems().filter((item) => !business.some((row) => String(row.postId) === String(item.postId))).map((item) => ({ id: item.postId, postId: item.postId, title: '发言已收到办理答复', content: item.summary, detail: item.at, read: item.read, kind: 'reply', type: '业务通知' }));
+  const notices = sortedHomeNotices().map((item) => ({ id: item.id, title: item.title, content: item.summary, detail: item.meta, read: Boolean(state.noticeRead[item.id]), kind: 'notice', type: '通知公告' }));
+  return [...business, ...replies, ...notices];
 }
 function renderNoticePage() {
-  return `<div class="knowledge-page"><div class="page-head portal-head"><div><div class="page-kicker">职工服务</div><h1>通知公告</h1><p>及时查看平台规则、服务说明和工作提示</p></div><span class="date">2026 年 09 月 10 日 · 星期四</span></div>${renderPolicyNotices()}</div>`;
+  return `<div class="knowledge-page"><div class="message-center"><header class="staff-notice-toolbar message-center-toolbar">${renderMessageTabs()}</header>${renderMessageTabBody()}</div></div>`;
+}
+function renderMessageTabBody() {
+  const active = activeMessageTab();
+  if (active === '官方回复') return renderOfficialReplyMessages();
+  if (active === '业务通知') return renderBusinessNotifications();
+  return renderPolicyNotices();
 }
 function renderPersonalPosts(posts) {
   if (!posts.length) return '<p class="personal-empty">当前分类暂无发言。</p>';
@@ -739,7 +926,7 @@ function renderInteractionDetail() {
         : `<div class="interaction-detail-block"><span>举报内容</span><strong>${escapeHtml(item.title)}</strong><p>举报原因：${escapeHtml(item.content)}</p><div class="interaction-status-row"><b>处理中</b><small>${escapeHtml(item.detail)}</small></div></div>`;
   const sourcePost = portalPosts.find((post) => post.title === item.title);
   const sourceContent = sourcePost ? `<div class="interaction-source-block"><span>关联原帖</span><strong>${escapeHtml(sourcePost.title)}</strong><small>${escapeHtml(sourcePost.board)} · ${escapeHtml(sourcePost.author)} · ${escapeHtml(sourcePost.time)}</small><p>${escapeHtml(sourcePost.excerpt)}</p></div>` : '';
-  return `<div class="ranking-backdrop" onclick="AppPrototype.closeInteractionDetail(event)"><section class="ranking-modal interaction-detail-modal" role="dialog" aria-modal="true" aria-labelledby="interaction-detail-title"><header class="ranking-modal-head"><div><span>个人中心 · 互动</span><h2 id="interaction-detail-title">${item.type}记录</h2><p>查看这条互动的具体内容和处理状态</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeInteractionDetail()">${icon('x')}</button></header><div class="interaction-detail-body">${detail}${sourceContent}</div><footer class="post-compose-actions"><button type="button" class="primary" onclick="AppPrototype.closeInteractionDetail()">关闭</button></footer></section></div>`;
+  return `<div class="ranking-backdrop" onclick="AppPrototype.closeInteractionDetail(event)"><section class="ranking-modal interaction-detail-modal" role="dialog" aria-modal="true" aria-labelledby="interaction-detail-title"><header class="ranking-modal-head"><div><span>${state.workspaceView === 'notices' ? '消息中心 · 互动' : '个人中心 · 互动'}</span><h2 id="interaction-detail-title">${item.type}记录</h2><p>查看这条互动的具体内容和处理状态</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeInteractionDetail()">${icon('x')}</button></header><div class="interaction-detail-body">${detail}${sourceContent}</div><footer class="ranking-modal-foot"><button type="button" class="primary" onclick="AppPrototype.closeInteractionDetail()">关闭</button></footer></section></div>`;
 }
 function renderPersonalFavoriteDetail() {
   const item = state.personalFavoriteIndex === null ? null : personalFavorites[state.personalFavoriteIndex];
@@ -749,25 +936,30 @@ function renderPersonalFavoriteDetail() {
 }
 function renderPersonalCenter() {
   const user = state.session;
-  const unreadCount = homeNotices.filter((notice) => !state.noticeRead[notice.id]).length + unreadStaffReplies().length;
   const tabs = [['posts', '我的发言', 'file-text'], ['favorites', '收藏', 'star'], ['interactions', '互动', 'heart']];
-  const categories = staffProgressBoards;
+  const categories = ['全部', ...new Set(PrototypeData.postingBoards().map((board) => board.name).filter((name) => name !== '回音壁'))];
   const activeCategory = categories.includes(state.personalPostCategory) ? state.personalPostCategory : categories[0];
   const allMyPosts = ownedStaffPosts();
-  const myComments = allMyPosts.filter((post) => post.board === activeCategory);
+  const myComments = activeCategory === '全部' ? allMyPosts : allMyPosts.filter((post) => post.board === activeCategory);
   const progressItems = allMyPosts.map((post) => staffPostProgress(post));
   const processingCount = progressItems.filter((item) => ['待审核', '待处理', '处理中'].includes(item.label)).length;
   const repliedCount = progressItems.filter((item) => item.label === '已回复').length;
   const interactionCategories = ['评论', '点赞', '举报'];
   const interactionItems = personalInteractions.filter((item) => item.type === state.personalInteractionCategory);
   const interactionFilter = `<div class="personal-filter-bar">${interactionCategories.map((category) => `<button type="button" class="${state.personalInteractionCategory === category ? 'active' : ''}" onclick="AppPrototype.setPersonalInteractionCategory('${category}')">${category}</button>`).join('')}</div>`;
-  const tabBody = state.personalTab === 'posts' ? `<div class="personal-filter-bar">${categories.map((category) => `<button type="button" class="${activeCategory === category ? 'active' : ''}" onclick="AppPrototype.setPersonalPostCategory('${category}')">${category}</button>`).join('')}</div><div class="personal-list">${renderPersonalComments(myComments)}</div>` : state.personalTab === 'favorites' ? `<div class="personal-list">${personalFavorites.map((item) => `<article class="personal-post-row"><div class="personal-row-main"><div class="personal-row-meta"><span>${item.category}</span><small>${item.detail}</small></div><h3>${item.title}</h3><p>${item.excerpt}</p><div class="personal-row-stats">${icon('star')} 已收藏</div></div><button type="button" class="personal-row-action" onclick="AppPrototype.notify()">查看内容 ${icon('arrow-right')}</button></article>`).join('')}</div>` : `${interactionFilter}<div class="personal-list">${interactionItems.map((item, index) => `<article class="personal-interaction-row"><div class="personal-interaction-icon">${icon(item.icon)}</div><div class="personal-row-main"><div class="personal-row-meta"><span>${item.type}</span><small>${item.detail}</small></div><h3>${item.title}</h3></div><button type="button" class="personal-row-action" onclick="AppPrototype.openInteractionDetail(${personalInteractions.indexOf(item)})">查看记录 ${icon('arrow-right')}</button></article>`).join('')}</div>`;
-  return `<div class="personal-page"><div class="page-head portal-head"><div><div class="page-kicker">职工服务</div><h1>个人中心</h1><p>管理个人资料，查看发言与互动记录</p></div><span class="date">2026 年 09 月 10 日 · 星期四</span></div><section class="personal-profile"><div class="personal-identity"><div class="personal-avatar">${escapeHtml(user.name.slice(0, 1))}</div><div><h2>${escapeHtml(user.name)}</h2><p>${escapeHtml(user.department)}　·　账号已审核</p><span>${escapeHtml(user.phone.slice(0, 3) + '****' + user.phone.slice(-4))}</span></div></div><button type="button" class="personal-profile-action" onclick="AppPrototype.openPersonalEdit()">编辑资料 ${icon('pencil-line')}</button></section><section class="personal-panel"><nav class="personal-tabs" aria-label="个人中心分类">${tabs.map(([id, label, iconName]) => `<button type="button" class="${state.personalTab === id ? 'active' : ''}" onclick="AppPrototype.setPersonalTab('${id}')">${icon(iconName)}<span>${label}</span></button>`).join('')}</nav><div class="personal-tab-body">${tabBody}</div></section>${renderInteractionDetail()}${renderPersonalFavoriteDetail()}</div>`;
+  const tabBody = state.personalTab === 'posts' ? `<div class="personal-filter-bar">${categories.map((category) => `<button type="button" class="${activeCategory === category ? 'active' : ''}" onclick="AppPrototype.setPersonalPostCategory('${category}')">${category}</button>`).join('')}</div><div class="personal-list">${renderPersonalDrafts(activeCategory)}${renderPersonalComments(myComments)}</div>` : state.personalTab === 'favorites' ? `<div class="personal-list">${portalPosts.filter((post) => state.postActions[post.id]?.favorited && PrototypeData.isPublicPost(post)).map((post) => renderPortalPost(post)).join('') || '<p class="personal-empty">暂无收藏</p>'}</div>` : `${interactionFilter}<div class="personal-list">${interactionItems.map((item, index) => `<article class="personal-interaction-row"><div class="personal-interaction-icon">${icon(item.icon)}</div><div class="personal-row-main"><div class="personal-row-meta"><span>${item.type}</span><small>${item.detail}</small></div><h3>${item.title}</h3></div><button type="button" class="personal-row-action" onclick="AppPrototype.openInteractionDetail(${personalInteractions.indexOf(item)})">查看记录 ${icon('arrow-right')}</button></article>`).join('')}</div>`;
+  return `<div class="personal-page"><div class="page-head portal-head"><div><div class="page-kicker">职工服务</div><h1>个人中心</h1><p>管理个人资料，查看发言与互动记录</p></div><span class="date">2026 年 09 月 10 日 · 星期四</span></div><section class="personal-profile"><div class="personal-identity"><div class="personal-avatar">${staffProfile().avatar ? `<img src="${escapeHtml(staffProfile().avatar)}" alt="头像" width="64" height="64">` : escapeHtml(user.name.slice(0, 1))}</div><div><h2>${escapeHtml(user.name)}</h2><p>${escapeHtml(user.department)}　·　账号已审核</p><span>${escapeHtml(user.phone.slice(0, 3) + '****' + user.phone.slice(-4))}</span></div></div><div class="staff-profile-actions"><button type="button" class="personal-profile-action" onclick="AppPrototype.openPersonalEdit()">编辑资料 ${icon('pencil-line')}</button><button type="button" class="personal-profile-action" onclick="AppPrototype.openPasswordChange()">修改密码 ${icon('lock')}</button></div></section><section class="personal-panel"><nav class="personal-tabs" aria-label="个人中心分类">${tabs.map(([id, label, iconName]) => `<button type="button" class="${state.personalTab === id ? 'active' : ''}" onclick="AppPrototype.setPersonalTab('${id}')">${icon(iconName)}<span>${label}</span></button>`).join('')}</nav><div class="personal-tab-body">${tabBody}</div></section>${renderInteractionDetail()}${renderPersonalFavoriteDetail()}</div>`;
+}
+function staffProfile() {
+  try { return JSON.parse(localStorage.getItem('prototype-staff-profile-' + state.session.id) || '{}'); } catch (_) { return {}; }
 }
 function renderPersonalEditModal() {
   if (!state.personalEditOpen) return '';
-  const user = state.session;
-  return `<div class="ranking-backdrop" onclick="AppPrototype.closePersonalEdit(event)"><section class="ranking-modal personal-edit-modal" role="dialog" aria-modal="true" aria-labelledby="personal-edit-title"><header class="ranking-modal-head"><div><span>账号设置</span><h2 id="personal-edit-title">编辑资料</h2><p>维护个人信息、账号安全和发言隐私</p></div><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closePersonalEdit()">${icon('x')}</button></header><div class="personal-edit-body"><div class="personal-edit-avatar">${escapeHtml(user.name.slice(0, 1))}</div><div class="personal-edit-fields"><label>姓名<input value="${escapeHtml(user.name)}" readonly></label><label>所属部门<input value="${escapeHtml(user.department)}" readonly></label><label>联系电话<input value="${escapeHtml(user.phone.slice(0, 3) + '****' + user.phone.slice(-4))}" readonly></label><div class="personal-edit-setting"><div><strong>匿名发言</strong><span>发布时可选择匿名显示</span></div><button type="button" onclick="AppPrototype.notify()">设置</button></div><div class="personal-edit-setting"><div><strong>登录密码</strong><span>定期修改密码，保障账号安全</span></div><button type="button" onclick="AppPrototype.notify()">修改密码</button></div></div></div><footer class="personal-edit-foot"><button type="button" onclick="AppPrototype.closePersonalEdit()">关闭</button><button type="button" class="primary" onclick="AppPrototype.notify()">保存资料</button></footer></section></div>`;
+  const user = state.session, profile = staffProfile();
+  return `<div class="ranking-backdrop" onclick="AppPrototype.closePersonalEdit(event)"><section class="ranking-modal personal-edit-modal" role="dialog" aria-modal="true" aria-labelledby="personal-edit-title"><header class="ranking-modal-head"><h2 id="personal-edit-title">编辑资料</h2><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closePersonalEdit()">${icon('x')}</button></header><form onsubmit="event.preventDefault();AppPrototype.saveStaffProfile()"><div class="personal-edit-fields staff-profile-form"><label>头像<div id="profile-avatar-preview">${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="头像" width="64" height="64">` : icon('user-round')}</div><input type="file" id="staff-avatar-file" accept="image/png,image/jpeg,image/webp" onchange="AppPrototype.previewStaffAvatar(this)"></label><label>姓名<input value="${escapeHtml(user.name)}" disabled></label><label>昵称 *<input id="staff-profile-nickname" value="${escapeHtml(profile.nickname || user.name)}" minlength="2" maxlength="20" placeholder="2 至 20 个字符" required></label><fieldset><legend>性别 *</legend>${['男', '女'].map((gender) => `<label><input type="radio" name="staff-profile-gender" value="${gender}" ${(profile.gender || '男') === gender ? 'checked' : ''}> ${gender}</label>`).join('')}</fieldset><fieldset><legend>默认发言身份 *</legend>${[['real', '实名'], ['anonymous', '匿名']].map(([value, label]) => `<label><input type="radio" name="staff-profile-identity" value="${value}" ${(profile.publicationMode || 'real') === value ? 'checked' : ''}> ${label}</label>`).join('')}<small>发帖、评论时将默认选中该项，仍可临时切换</small></fieldset><label>所属部门<input value="${escapeHtml(user.department)}" disabled></label><label>联系电话<input value="${escapeHtml(user.phone)}" disabled></label></div><footer class="post-compose-actions"><button type="button" onclick="AppPrototype.closePersonalEdit()">取消</button><button type="submit" class="primary">保存资料</button></footer></form></section></div>`;
+}
+function renderPasswordChangeModal() {
+  return `<div class="ranking-backdrop" onclick="AppPrototype.closeAccountCenter(event)"><section class="ranking-modal personal-edit-modal" role="dialog" aria-modal="true" aria-label="修改密码"><header class="ranking-modal-head"><h2>修改密码</h2><button type="button" class="ranking-close" title="关闭" onclick="AppPrototype.closeAccountCenter()">${icon('x')}</button></header><form class="staff-profile-form" onsubmit="event.preventDefault();AppPrototype.changeAccountPassword()"><label>旧密码 *<input id="account-old-password" type="password" autocomplete="current-password" placeholder="请输入当前登录密码" required></label><label>新密码 *<input id="account-new-password" type="password" autocomplete="new-password" minlength="8" maxlength="32" placeholder="密码长度为 8 至 32 位" required></label><label>确认新密码 *<input id="account-confirm-password" type="password" autocomplete="new-password" placeholder="请再次输入新密码" required></label><footer class="post-compose-actions"><button type="button" onclick="AppPrototype.closeAccountCenter()">取消</button><button type="submit" class="primary">确认修改</button></footer></form></section></div>`;
 }
 function renderPolicyDetailBody(item) {
   if (item.type === '常见问答') {
@@ -837,9 +1029,9 @@ function renderPortalPost(post, sequence = null, options = {}) {
   const fullContent = expanded ? getPostFullContent(post).map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('') + ((post.mediaList || (post.media ? [post.media] : [])).length ? `<div class="portal-post-media-grid">${(post.mediaList || [post.media]).slice(0, 2).map((media) => `<figure class="portal-post-media"><img src="${escapeHtml(media.src)}" alt="${escapeHtml(media.alt)}"><figcaption>${escapeHtml(media.caption || '')}</figcaption></figure>`).join('')}</div>` : '') : '';
   const attachment = expanded && post.attachment ? `<div class="portal-post-attachment">${icon('paperclip')}<span><strong>${escapeHtml(post.attachment.name)}</strong><small>${formatPostFileSize(post.attachment.size)}</small></span><button type="button" onclick="AppPrototype.notify()">查看附件</button></div>` : '';
   const commentAction = commentsEnabled ? `<button type="button" class="${commentsOpen || actions.commented ? 'active' : ''}" onclick="AppPrototype.toggleComments(${postIdArg})">${icon('message-circle')} ${post.comments + (actions.newComment ? 1 : 0)} 条评论</button>` : `<button type="button" class="post-comments-disabled" disabled>${icon('message-circle-off')} 评论已关闭</button>`;
-  const ownerActions = options.ownerProgress ? `<div class="personal-post-owner-actions"><button type="button" class="post-progress-button" onclick="AppPrototype.openPostProgress('${escapeHtml(post.id)}')">${icon('route')} 查看进度</button>${options.ownerProgress.canResubmit ? `<button type="button" class="post-resubmit-button" onclick="AppPrototype.editRejectedPost('${escapeHtml(post.id)}')">${icon('pencil-line')} 修改后重新提交</button>` : ''}</div>` : '';
+  const ownerActions = options.ownerProgress ? `<div class="personal-post-owner-actions">${options.ownerProgress.canResubmit ? `<button type="button" class="post-resubmit-button" onclick="AppPrototype.editRejectedPost('${escapeHtml(post.id)}')">${icon('pencil-line')} 修改后重新提交</button>` : ''}${renderOwnerMenu(post.id, false)}</div>` : '';
   const reportReasonOptions = reportOpen ? PrototypeData.read().dictionaryEntries.filter((item) => item.typeId === 'dict-report-reason').sort((a, b) => a.sort - b.sort) : [];
-  return `<article class="portal-post-card ${sequence ? 'numbered' : ''}">${sequence ? `<b class="post-sequence">${String(sequence).padStart(2, '0')}</b>` : ''}<div class="portal-post-card-head"><span>${escapeHtml(post.board)}</span><i></i><small>${escapeHtml(post.author)} · ${escapeHtml(post.time)}</small></div><h3>${escapeHtml(post.title)}</h3><p class="${expanded ? 'expanded' : ''}">${escapeHtml(post.excerpt)}</p>${expanded ? `<div class="portal-post-full">${fullContent}</div>${attachment}` : ''}<button type="button" class="read-more" aria-expanded="${expanded}" onclick="AppPrototype.togglePostExpanded(${postIdArg})">${expanded ? '收起全文' : '阅读全文'} ${icon(expanded ? 'chevron-up' : 'chevron-down')}</button>${ownerActions}<div class="post-actions"><button type="button" class="${actions.liked ? 'active' : ''}" onclick="AppPrototype.togglePostAction(${postIdArg}, 'liked')">${icon('thumbs-up')} ${actions.liked ? '已赞' : '点赞'} ${likes}</button>${commentAction}<button type="button" class="${actions.favorited ? 'active' : ''}" onclick="AppPrototype.togglePostAction(${postIdArg}, 'favorited')">${icon('star')} ${actions.favorited ? '已收藏' : '收藏'} ${favorites}</button><button type="button" onclick="AppPrototype.sharePost(${postIdArg})">${icon('share-2')} 分享 ${post.shares || 0}</button><button type="button" class="danger-action ${actions.reported ? 'active' : ''}" onclick="AppPrototype.toggleReport(${postIdArg})">${icon('flag')} 举报</button></div>${commentsOpen ? `<section class="comment-zone"><div class="comment-list">${post.commentList.map((comment, index) => `<article><div><strong>${escapeHtml(comment.author)}</strong><span class="comment-status">${escapeHtml(comment.status)}</span></div><p>${escapeHtml(comment.text)}</p><button type="button" onclick="AppPrototype.replyToComment(${postIdArg}, ${index})">回复</button></article>`).join('')}${actions.newComment ? `<article><div><strong>我</strong><span class="comment-status reviewing">审核中</span></div><p>${escapeHtml(actions.newComment)}</p></article>` : ''}</div><div class="comment-compose"><textarea id="comment-${post.id}" placeholder="${escapeHtml(state.replyTarget ? `回复 @${state.replyTarget}` : '发表评论，提交后将进入审核')}"></textarea><button type="button" onclick="AppPrototype.submitComment(${postIdArg})">发布评论</button></div></section>` : ''}${reportOpen ? `<section class="report-zone"><label for="report-type-${post.id}">举报原因类型</label><select id="report-type-${post.id}"><option value="">请选择举报原因类型</option>${reportReasonOptions.map((item) => `<option value="${escapeHtml(item.label)}">${escapeHtml(item.label)}</option>`).join('')}</select><label for="report-${post.id}">举报说明</label><textarea id="report-${post.id}" placeholder="请具体说明需要核查的问题"></textarea><div><button type="button" class="cancel-report" onclick="AppPrototype.toggleReport(${postIdArg})">取消</button><button type="button" class="submit-report" onclick="AppPrototype.submitReport(${postIdArg})">提交举报</button></div></section>` : ''}</article>`;
+  return `<article class="portal-post-card ${sequence ? 'numbered' : ''}">${sequence ? `<b class="post-sequence">${String(sequence).padStart(2, '0')}</b>` : ''}<div class="portal-post-card-head"><span>${escapeHtml(post.board)}</span><i></i><small>${escapeHtml(post.author)} · ${escapeHtml(post.time)}</small></div><h3>${escapeHtml(post.title)}${post.subtitle ? ` - ${escapeHtml(post.subtitle)}` : ''}</h3><p class="${expanded ? 'expanded' : ''}">${escapeHtml(post.excerpt)}</p>${expanded ? `<div class="portal-post-full">${fullContent}</div>${attachment}` : ''}<button type="button" class="read-more" aria-expanded="${expanded}" onclick="AppPrototype.togglePostExpanded(${postIdArg})">${expanded ? '收起全文' : '查看全文'} ${icon(expanded ? 'chevron-up' : 'chevron-down')}</button>${ownerActions}<div class="post-actions"><button type="button" class="${actions.liked ? 'active' : ''}" onclick="AppPrototype.togglePostAction(${postIdArg}, 'liked')">${icon('thumbs-up')} ${actions.liked ? '已赞' : '点赞'} ${likes}</button>${commentAction}<button type="button" class="${actions.favorited ? 'active' : ''}" onclick="AppPrototype.togglePostAction(${postIdArg}, 'favorited')">${icon('star')} ${actions.favorited ? '已收藏' : '收藏'} ${favorites}</button><button type="button" onclick="AppPrototype.sharePost(${postIdArg})">${icon('share-2')} 分享 ${post.shares || 0}</button>${ownedStaffPosts().some((item) => String(item.id) === String(post.id)) ? '' : `<button type="button" class="danger-action ${actions.reported ? 'active' : ''}" onclick="AppPrototype.toggleReport(${postIdArg})">${icon('flag')} 举报</button>`}</div>${commentsOpen ? `<section class="comment-zone"><div class="comment-list">${post.commentList.map((comment, index) => `<article><div><strong>${escapeHtml(comment.author)}</strong><span class="comment-status">${escapeHtml(comment.status)}</span></div><p>${escapeHtml(comment.text)}</p><button type="button" onclick="AppPrototype.replyToComment(${postIdArg}, ${index})">回复</button></article>`).join('')}${actions.newComment ? `<article><div><strong>我</strong><span class="comment-status reviewing">审核中</span></div><p>${escapeHtml(actions.newComment)}</p></article>` : ''}</div><div class="comment-compose"><textarea id="comment-${post.id}" placeholder="${escapeHtml(state.replyTarget ? `回复 @${state.replyTarget}` : '发表评论，提交后将进入审核')}"></textarea><button type="button" onclick="AppPrototype.submitComment(${postIdArg})">发布评论</button></div></section>` : ''}${reportOpen ? `<section class="report-zone"><label for="report-type-${post.id}">举报原因类型</label><select id="report-type-${post.id}"><option value="">请选择举报原因类型</option>${reportReasonOptions.map((item) => `<option value="${escapeHtml(item.label)}">${escapeHtml(item.label)}</option>`).join('')}</select><label for="report-${post.id}">举报说明</label><textarea id="report-${post.id}" placeholder="请具体说明需要核查的问题"></textarea><div><button type="button" class="cancel-report" onclick="AppPrototype.toggleReport(${postIdArg})">取消</button><button type="button" class="submit-report" onclick="AppPrototype.submitReport(${postIdArg})">提交举报</button></div></section>` : ''}</article>`;
 }
 
 function sharedPostFor(data, id) {
@@ -883,12 +1075,13 @@ function renderWorkspaceContent() { if (state.session.role === 'staff' && state.
 function renderAccountCenterModal() {
   if (!state.accountCenterOpen || !state.session) return '';
   const user = state.session, tab = state.accountCenterTab;
+  if (tab === 'security') return renderPasswordChangeModal();
   const basic = `<div class="account-basic"><aside><div class="account-avatar">${escapeHtml(user.name.slice(0,1))}</div><h3>${escapeHtml(user.name)}</h3><p>服务基层 · 倾听心声 · 协同办理</p><dl><div><dt>账号</dt><dd>${escapeHtml(user.id)}</dd></div><div><dt>部门</dt><dd>${escapeHtml(user.department)}</dd></div><div><dt>当前角色</dt><dd>${escapeHtml(roleMeta[user.role]?.[0] || '职工')}</dd></div></dl></aside><section><label><span><b>*</b> 昵称</span><input class="input" id="account-center-name" value="${escapeHtml(user.name)}"></label><div class="account-gender"><span><b>*</b> 性别</span>${['男','女','未知'].map((item) => `<label><input type="radio" name="account-center-gender" value="${item}" ${(user.gender || '未知') === item ? 'checked' : ''}><span>${item}</span></label>`).join('')}</div><button class="account-primary" onclick="AppPrototype.saveAccountCenter()">更新信息</button></section></div>`;
   const security = `<form class="account-security" onsubmit="event.preventDefault();AppPrototype.changeAccountPassword()">${[['原密码','account-old-password'],['新密码','account-new-password'],['确认密码','account-confirm-password']].map(([label,id]) => `<label><span><b>*</b> ${label}</span><input class="input" id="${id}" type="password" placeholder="请输入"></label>`).join('')}<button class="account-primary" type="submit">修改密码</button></form>`;
   const devices = `<div class="account-devices"><h3>我的在线设备</h3><div class="account-table-wrap"><table><thead><tr><th>序号</th><th>登录平台</th><th>IP 地址</th><th>登录地址</th><th>浏览器</th><th>系统</th><th>登录时间</th><th>操作</th></tr></thead><tbody><tr><td>1</td><td>PC</td><td>117.152.223.105</td><td>中国湖北省武汉市</td><td>Chrome</td><td>OS X</td><td>2026-09-14 14:26</td><td><button onclick="AppPrototype.notify()">强制下线</button></td></tr></tbody></table></div></div>`;
   return `<div class="account-modal-backdrop" onclick="AppPrototype.closeAccountCenter(event)"><section class="account-modal" role="dialog" aria-modal="true" aria-label="个人中心"><header><h2>个人中心</h2><button onclick="AppPrototype.closeAccountCenter()" title="关闭">${icon('x')}</button></header><nav>${[['basic','基本设置'],['security','安全设置'],['devices','在线设备']].map(([id,label]) => `<button class="${tab === id ? 'active' : ''}" onclick="AppPrototype.setAccountCenterTab('${id}')">${label}</button>`).join('')}</nav><div class="account-modal-body">${tab === 'basic' ? basic : tab === 'security' ? security : devices}</div></section></div>`;
 }
-function renderWorkspace() { if (state.session.role === 'staff' && state.staffDisplayMode === 'mobile') return renderMobileWorkspace(); return `<div class="workspace role-${state.session.role}">${renderTopbar()}${renderSidebar()}<main class="workspace-main">${renderWorkspaceContent()}</main>${renderRankingModal()}${renderRankingDetailModal()}${renderHotPolicyModal()}${renderPolicyDetailModal()}${renderNoticeDetailModal()}${renderPolicyQuestionModal()}${renderMyPolicyQuestionsModal()}${renderBannerDetailModal()}${state.session.role === 'staff' ? renderPersonalEditModal() + renderProgressListModal() + renderAffairProgressModal() + renderPostComposer() : ''}</div>`; }
+function renderWorkspace() { if (state.session.role === 'staff' && state.staffDisplayMode === 'mobile') return renderMobileWorkspace(); return `<div class="workspace role-${state.session.role}">${renderTopbar()}${renderSidebar()}<main class="workspace-main">${renderWorkspaceContent()}</main>${renderRankingModal()}${renderRankingDetailModal()}${renderHotPolicyModal()}${renderPolicyDetailModal()}${renderNoticeDetailModal()}${renderPolicyQuestionModal()}${renderMyPolicyQuestionsModal()}${renderBannerDetailModal()}${state.session.role === 'staff' ? renderPersonalEditModal() + renderAccountCenterModal() + renderProgressListModal() + renderAffairProgressModal() + renderPostComposer() : ''}</div>`; }
 function syncPrototypeData() {
   const data = window.PrototypeData?.read();
   if (!data) return;
@@ -905,7 +1098,7 @@ function syncPrototypeData() {
     const localComment = state.postActions[source.id].newComment;
     if (localComment && data.comments.some((c) => String(c.postId) === String(source.id) && c.authorId === actorId && c.text === localComment && c.status !== '待审核')) delete state.postActions[source.id].newComment;
     const visibleStatus = ['建言献策', '心声诉求'].includes(source.board) && source.handlingStatus && source.handlingStatus !== '不适用' ? source.handlingStatus : source.status;
-    Object.assign(post, { title: source.title, board: source.board, author: source.author, authorId: source.authorId || '', processingAccepted: source.processingAccepted === true, status: visibleStatus, reason: source.reason || '', history: source.history || [], time: source.time, excerpt: source.body, content: [source.body], attachment: source.attachment || null, allowComments: source.allowComments !== false, managedUnavailable: source.enabled === false || source.deleted === true, likes: engagement.likes, favorites: engagement.favorites, shares: engagement.shares, comments: engagement.historicComments + publishedComments.length, commentList: publishedComments.map((c) => ({ author: c.author, text: c.text, status: '已通过' })) });
+    Object.assign(post, { title: source.title, subtitle: source.subtitle || '', contentAuditStatus: source.contentAuditStatus, publishStatus: source.publishStatus, enabled: source.enabled, deleted: source.deleted, board: source.board, author: source.author, authorId: source.authorId || '', processingAccepted: source.processingAccepted === true, status: visibleStatus, reason: source.reason || '', history: source.history || [], time: source.time, excerpt: source.body, content: [source.body], attachment: source.attachment || null, allowComments: source.allowComments !== false, managedUnavailable: source.enabled === false || source.deleted === true, likes: engagement.likes, favorites: engagement.favorites, shares: engagement.shares, comments: engagement.historicComments + publishedComments.length, commentList: publishedComments.map((c) => ({ author: c.author, text: c.text, status: '已通过' })) });
   }
   const echoPublications = (data.echoPublications || []).filter((item) => PrototypeData.isPublicEcho(item, data));
   const publishedIds = new Set(echoPublications.map((item) => 6000 + Number(item.sourcePostId || 0)));
@@ -924,7 +1117,7 @@ function syncPrototypeData() {
   personalAffairs.splice(0, personalAffairs.length, ...data.affairs.map((a) => ({ id: a.id, title: a.title, category: portalPosts.find((post) => post.id === a.postId)?.board || a.sourceType || '事项', status: a.status, events: a.events || [], update: `${a.category || '待分类'} · ${a.isKey ? '重点事项' : a.isCommon ? '共性事项' : '一般事项'}`, step: a.status === '已回复' ? a.draft : a.status === '处理中' ? '事项正在研究并整理回复' : '等待管理人员分类处理' })));
   const sharedNoticeIds = new Set(data.notices.map((n) => n.id));
   for (let i = homeNotices.length - 1; i >= 0; i--) if (sharedNoticeIds.has(homeNotices[i].id)) homeNotices.splice(i, 1);
-  for (const notice of data.notices.filter((n) => n.status === '已发布')) homeNotices.unshift({ id: notice.id, channel: '其他', category: '其他', icon: 'megaphone', title: notice.title, summary: notice.body, body: notice.body, attachment: notice.attachment || null, meta: `${notice.scope} · 最新公告`, publishedAt: notice.publishedAt || notice.createdAt || notice.submittedAt });
+  for (const notice of data.notices.filter((n) => n.status === '已发布')) { const noticeDate = replyDateLabel(notice.publishedAt || notice.createdAt || notice.submittedAt); homeNotices.unshift({ id: notice.id, channel: '其他', category: '其他', icon: 'megaphone', title: notice.title, summary: notice.body, body: notice.body, attachment: notice.attachment || null, meta: `${notice.scope} · ${noticeDate === REPLY_DATE_FALLBACK ? '最新公告' : noticeDate}`, publishedAt: notice.publishedAt || notice.createdAt || notice.submittedAt }); }
   for (const type of ['policy', 'faq', 'rectification']) for (let i = policyContent[type].length - 1; i >= 0; i--) if (policyContent[type][i].sharedPublication) policyContent[type].splice(i, 1);
   const managedPolicyTitles = new Set((data.policies || []).map((item) => item.title));
   const managedQuestionTitles = new Set((data.questions || []).filter((item) => item.status === '已发布' && item.answer).map((item) => item.title));
@@ -936,7 +1129,7 @@ function syncPrototypeData() {
   for (const question of (data.questions || []).filter((item) => item.status === '已发布' && item.answer)) policyContent.faq.unshift({ id: `shared-${question.id}`, sharedPublication: true, type: '常见问答', title: question.title, category: question.category, department: question.department, date: question.answeredAt || question.submittedAt, summary: question.answer, answer: question.answer, hotPinned: question.hotPinned === true, hotOrder: Number.isFinite(question.hotOrder) ? question.hotOrder : null });
   for (const item of (data.rectificationPublications || []).filter((entry) => entry.status === '已发布')) policyContent.rectification.unshift({ id: `shared-${item.id}`, sharedPublication: true, type: '整改公开', title: item.title, category: item.category, department: item.department, date: item.publishedAt, summary: item.summary, result: item.result, measure: item.measure, progress: item.progress });
 }
-function render() { const affairScrollTop = document.querySelector('.affair-review-list')?.scrollTop || 0; syncPrototypeData(); byId('app').innerHTML = state.view === 'workspace' && state.session ? renderWorkspace() : renderAuth(); const affairList = document.querySelector('.affair-review-list'); if (affairList) affairList.scrollTop = affairScrollTop; const mobileStaffView = state.view === 'workspace' && state.session?.role === 'staff' && state.staffDisplayMode === 'mobile'; const knowledgeView = !mobileStaffView && state.view === 'workspace' && state.session?.role === 'staff' && ['policy', 'notices'].includes(state.workspaceView); const personalView = !mobileStaffView && state.view === 'workspace' && state.session?.role === 'staff' && state.workspaceView === 'profile'; const desktopRouteModalOpen = !mobileStaffView && Boolean(state.hotPolicyOpen || state.policyDetailId || state.noticeDetailId || state.policyQuestionOpen || state.myPolicyQuestionsOpen || state.personalProgressId !== null); const postComposerModalOpen = state.postComposerOpen && !mobileStaffView; const modalOpen = Boolean(state.rankModal || state.rankingDetail || state.bannerDetail || postComposerModalOpen || state.personalEditOpen || state.progressListOpen || state.personalFavoriteIndex !== null || state.interactionDetail !== null || desktopRouteModalOpen); document.documentElement.classList.toggle('mobile-staff-view', mobileStaffView); document.documentElement.classList.toggle('knowledge-view', knowledgeView); document.documentElement.classList.toggle('personal-view', personalView); document.body.classList.toggle('modal-open', modalOpen); window.lucide?.createIcons?.(); }
+function render() { const affairScrollTop = document.querySelector('.affair-review-list')?.scrollTop || 0; syncPrototypeData(); byId('app').innerHTML = state.view === 'workspace' && state.session ? renderWorkspace() : renderAuth(); const affairList = document.querySelector('.affair-review-list'); if (affairList) affairList.scrollTop = affairScrollTop; const mobileStaffView = state.view === 'workspace' && state.session?.role === 'staff' && state.staffDisplayMode === 'mobile'; const knowledgeView = !mobileStaffView && state.view === 'workspace' && state.session?.role === 'staff' && ['policy', 'notices'].includes(state.workspaceView); const personalView = !mobileStaffView && state.view === 'workspace' && state.session?.role === 'staff' && state.workspaceView === 'profile'; const desktopRouteModalOpen = !mobileStaffView && Boolean(state.hotPolicyOpen || state.policyDetailId || state.noticeDetailId || state.policyQuestionOpen || state.myPolicyQuestionsOpen || state.personalProgressId !== null); const postComposerModalOpen = state.postComposerOpen && !mobileStaffView; const modalOpen = Boolean(state.accountCenterOpen || state.rankModal || state.rankingDetail || state.bannerDetail || postComposerModalOpen || state.personalEditOpen || state.progressListOpen || state.personalFavoriteIndex !== null || state.interactionDetail !== null || desktopRouteModalOpen); document.documentElement.classList.toggle('mobile-staff-view', mobileStaffView); document.documentElement.classList.toggle('knowledge-view', knowledgeView); document.documentElement.classList.toggle('personal-view', personalView); document.body.classList.toggle('modal-open', modalOpen); window.lucide?.createIcons?.(); }
 let noticeCarouselTimer;
 function startNoticeCarousel() {
   clearInterval(noticeCarouselTimer);
@@ -960,10 +1153,94 @@ window.AppPrototype = {
   setPortalTab(portalTab) { setState({ portalTab }); },
   setHomeContentTab(homeContentTab) { setState({ homeContentTab, expandedPostId: null, commentPostId: null, reportPostId: null }); },
   setPolicyTab(policyTab) { setState({ policyTab, policyDetailId: null }); },
+  acknowledgeNotice(kind, id) {
+    if (kind === 'notice') return this.readNotice(id);
+    if (kind === 'reply') { state.replyRead[id] = true; saveMessageReadState(); render(); return; }
+    const data = PrototypeData.read();
+    const item = (data.staffNotifications || []).find((row) => String(row.id) === String(id) && String(row.authorId) === String(state.session.id));
+    if (item) { item.readAt = new Date().toISOString(); PrototypeData.save(data); render(); }
+  },
+  markUnifiedNoticesRead() {
+    state.noticeRead = Object.fromEntries(homeNotices.map((item) => [item.id, true]));
+    officialReplyItems().forEach((item) => { state.replyRead[item.postId] = true; });
+    const data = PrototypeData.read();
+    (data.staffNotifications || []).filter((item) => String(item.authorId) === String(state.session.id)).forEach((item) => { item.readAt = item.readAt || new Date().toISOString(); });
+    saveMessageReadState(); PrototypeData.save(data); render(); showToast('已全部标记为已读');
+  },
+  openUnifiedNotice(kind, id, postId) {
+    this.acknowledgeNotice(kind, id);
+    if (kind === 'notice') return this.openNotice(id);
+    if (postId) return this.openPostProgress(postId);
+    showToast('暂无关联发言');
+  },
   setNoticeTab(noticeTab) { setState({ noticeTab }); },
-  showHomeNotice(id) { const notice = homeNotices.find((item) => String(item.id) === String(id)); if (!notice) return; setState({ noticeRead: { ...state.noticeRead, [id]: true }, noticeDetailId: id }); },
+  setMessageTab(messageTab) { setState({ messageTab, noticeDetailId: null, interactionDetail: null }); },
+  readInteraction(index) { if (personalInteractions[index] === undefined) return; setState({ interactionDetail: index, interactionRead: { ...state.interactionRead, [index]: true } }); saveMessageReadState(); },
+  markAllInteractionsRead() { if (!interactionUnreadCount()) return showToast('互动消息已全部读完。'); setState({ interactionRead: Object.fromEntries(personalInteractions.map((_, index) => [index, true])) }); saveMessageReadState(); showToast('已将全部互动消息标记为已读。'); },
+  readReply(postId) {
+    const key = String(postId);
+    if (!officialReplyItems().some((item) => item.postId === key)) return showToast('未找到对应的官方回复。');
+    const data = PrototypeData.read();
+    let changed = false;
+    for (const notification of data.staffNotifications || []) {
+      if (String(notification.postId) === key && notification.authorId === (state.session?.id || 'staff') && !notification.readAt) { notification.readAt = new Date().toLocaleString('zh-CN'); changed = true; }
+    }
+    if (changed) PrototypeData.save(data);
+    setState({ replyRead: { ...state.replyRead, [key]: true }, progressListOpen: false });
+    saveMessageReadState();
+    this.openPostProgress(key);
+  },
+  markAllRepliesRead() {
+    const items = officialReplyItems();
+    if (!items.some((item) => item.unread)) return showToast('官方回复已全部读完。');
+    const data = PrototypeData.read();
+    const next = { ...state.replyRead };
+    let changed = false;
+    for (const item of items) {
+      next[item.postId] = true;
+      for (const notification of data.staffNotifications || []) {
+        if (String(notification.postId) === item.postId && notification.authorId === (state.session?.id || 'staff') && !notification.readAt) { notification.readAt = new Date().toLocaleString('zh-CN'); changed = true; }
+      }
+    }
+    if (changed) PrototypeData.save(data);
+    setState({ replyRead: next });
+    saveMessageReadState();
+    showToast('已将全部官方回复标记为已读。');
+  },
+  showHomeNotice(id) { const notice = homeNotices.find((item) => String(item.id) === String(id)); if (!notice) return; setState({ noticeRead: { ...state.noticeRead, [id]: true }, noticeDetailId: id }); saveMessageReadState(); },
   openProgressList() { setState({ progressListOpen: true, personalProgressId: null }); },
   closeProgressList(event) { if (event && event.target !== event.currentTarget) return; setState({ progressListOpen: false }); },
+  openPrivateChat(postId) { PrivateChat.open(postId, 'staff', state.session.id, state.session.name); },
+  submitProgressReply(postId) {
+    const text = document.getElementById(`progress-reply-${postId}`)?.value.trim();
+    if (!text) return showToast('请输入回复内容');
+    const quote = document.getElementById(`progress-reply-${postId}`)?.closest('.official-reply-compose').replyQuote || null;
+    if (!PrivateChat.reply(postId, state.session.id, text, quote)) return showToast('回复未发送，请检查内容或发帖权限');
+    render();
+    showToast('回复已发送');
+  },
+  expandMessageReply(button) {
+    const block = button.closest('.official-reply-block');
+    const compose = block.querySelector('.official-reply-compose');
+    const article = button.closest('article');
+    compose.replyQuote = { messageId: article.dataset.messageId || 'official-reply', sender: button.dataset.sender, text: article.querySelector('p').textContent };
+    compose.querySelector('.message-reply-quote')?.remove();
+    compose.insertAdjacentHTML('afterbegin', PrivateChat.quoteHtml(compose.replyQuote));
+    block.querySelectorAll('.official-reply-expand').forEach((item) => item.setAttribute('aria-expanded', 'false'));
+    button.closest('article').append(compose);
+    compose.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    const input = compose.querySelector('textarea');
+    input.placeholder = `回复 @${button.dataset.sender}`;
+    input.focus();
+    compose.scrollIntoView({ block: 'nearest' });
+  },
+  cancelMessageReply(button) {
+    const block = button.closest('.official-reply-block');
+    block.querySelector('.official-reply-compose').hidden = true;
+    block.querySelector('.official-reply-compose').replyQuote = null;
+    block.querySelectorAll('.official-reply-expand').forEach((item) => item.setAttribute('aria-expanded', 'false'));
+  },
   openPostProgress(personalProgressId) {
     const data = PrototypeData.read();
     const post = ownedStaffPosts(data).find((item) => String(item.id) === String(personalProgressId));
@@ -1015,6 +1292,23 @@ window.AppPrototype = {
     showToast('个人资料已更新。');
   },
   openMobilePersonal(personalTab = 'posts') { setState({ personalTab, workspaceView: 'profile' }); },
+  previewStaffAvatar(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) { input.value = ''; return showToast('请选择 2MB 以内的 PNG、JPG 或 WebP 图片'); }
+    const reader = new FileReader();
+    reader.onload = () => { const preview = byId('profile-avatar-preview'); if (preview) { preview.dataset.avatar = reader.result; preview.innerHTML = '<img alt="头像" width="64" height="64">'; preview.querySelector('img').src = reader.result; } };
+    reader.readAsDataURL(file);
+  },
+  saveStaffProfile() {
+    const nickname = byId('staff-profile-nickname').value.trim();
+    if (nickname.length < 2 || nickname.length > 20) return showToast('昵称需为 2 至 20 个字符');
+    const profile = { ...staffProfile(), nickname, gender: document.querySelector('input[name="staff-profile-gender"]:checked').value, publicationMode: document.querySelector('input[name="staff-profile-identity"]:checked').value };
+    const avatar = byId('profile-avatar-preview').dataset.avatar;
+    if (avatar) profile.avatar = avatar;
+    try { localStorage.setItem('prototype-staff-profile-' + state.session.id, JSON.stringify(profile)); } catch (_) { return showToast('本地存储空间不足，资料未保存'); }
+    setState({ personalEditOpen: false }); showToast('资料已保存');
+  },
   openPersonalEdit() { setState({ personalEditOpen: true }); },
   closePersonalEdit(event) { if (event && event.target !== event.currentTarget) return; setState({ personalEditOpen: false }); },
   setPersonalPostCategory(personalPostCategory) { setState({ personalPostCategory, personalExpandedPostId: null }); },
@@ -1038,12 +1332,12 @@ window.AppPrototype = {
     showToast('问题已提交，等待相关部门答复。');
   },
   searchPolicyTerm(term) { const input = byId('policy-search'); if (input) input.value = term; showToast(`已为你检索“${term}”（原型演示）。`); },
-  readNotice(id) { if (state.noticeRead[id]) return; setState({ noticeRead: { ...state.noticeRead, [id]: true } }); showToast('通知已标记为已读。'); },
-  openNotice(id) { const notice = homeNotices.find((item) => item.id === id); if (!notice) return; setState({ noticeRead: { ...state.noticeRead, [id]: true }, noticeDetailId: id }); if (state.staffDisplayMode === 'mobile') window.scrollTo(0, 0); },
+  readNotice(id) { if (state.noticeRead[id]) return; setState({ noticeRead: { ...state.noticeRead, [id]: true } }); saveMessageReadState(); showToast('通知已标记为已读。'); },
+  openNotice(id) { const notice = homeNotices.find((item) => item.id === id); if (!notice) return; setState({ noticeRead: { ...state.noticeRead, [id]: true }, noticeDetailId: id }); saveMessageReadState(); if (state.staffDisplayMode === 'mobile') window.scrollTo(0, 0); },
   closeNoticeDetail(event) { if (event && event.target !== event.currentTarget) return; setState({ noticeDetailId: null }); if (state.staffDisplayMode === 'mobile') window.scrollTo(0, 0); },
   previewNoticeFile(id) { openNoticeFile(id, false); },
   downloadNoticeFile(id) { openNoticeFile(id, true); },
-  markAllNoticesRead() { if (homeNotices.every((notice) => state.noticeRead[notice.id])) return showToast('通知已全部读完。'); setState({ noticeRead: Object.fromEntries(homeNotices.map((notice) => [notice.id, true])) }); showToast('已将全部通知标记为已读。'); },
+  markAllNoticesRead() { if (homeNotices.every((notice) => state.noticeRead[notice.id])) return showToast('通知已全部读完。'); setState({ noticeRead: Object.fromEntries(homeNotices.map((notice) => [notice.id, true])) }); saveMessageReadState(); showToast('已将全部通知标记为已读。'); },
   openHotPolicies() { setState({ hotPolicyOpen: true }); if (state.staffDisplayMode === 'mobile') window.scrollTo(0, 0); },
   closeHotPolicies(event) { if (event && event.target !== event.currentTarget) return; setState({ hotPolicyOpen: false }); if (state.staffDisplayMode === 'mobile') window.scrollTo(0, 0); },
   openHotPolicyDetail(policyDetailId) { setState({ hotPolicyOpen: false, policyDetailId }); if (state.staffDisplayMode === 'mobile') window.scrollTo(0, 0); },
@@ -1096,8 +1390,73 @@ window.AppPrototype = {
   replyTo(author) { state.replyTarget = author; const textarea = document.querySelector('.comment-compose textarea'); if (textarea) textarea.focus(); },
   replyToComment(id, index) { const detailPost = getRankingDetailPost(); const author = (portalPosts.find((post) => post.id === id) || (detailPost?.id === id ? detailPost : null))?.commentList[index]?.author; if (author) this.replyTo(author); },
   submitComment(id) { const data = PrototypeData.read(), post = sharedPostFor(data, id); if (post?.allowComments === false) return showToast('该帖子已关闭评论。'); const value = byId(`comment-${id}`)?.value.trim(); if (!value) return showToast('请输入评论内容后再发布。'); const text = `${state.replyTarget ? `回复 @${state.replyTarget}：` : ''}${value}`; const blocked = PrototypeData.blockedWord(text, '评论', data); if (blocked) blocked.hitCount = (Number.isFinite(blocked.hitCount) ? blocked.hitCount : 0) + 1; if (blocked?.riskLevel === '高') { PrototypeData.save(data); return showToast('内容包含禁止发布信息，请修改后重试。'); } const match = PrototypeData.protectedMatch(text, '评论', data); if (match) match.list.hitCount += 1; const requiresReview = Boolean(blocked || match); const reviewPriority = blocked?.riskLevel === '中' ? '优先' : requiresReview ? '普通' : ''; const createdAt = new Date().toLocaleString('sv-SE', { hour12: false }); data.comments.push({ id: `PL-${Date.now()}`, postId: id, author: state.session?.name || '职工', authorId: state.session?.id || 'staff', department: state.session?.department || '未配置', text, createdAt, status: requiresReview ? '待审核' : '已发布', risk: blocked ? `${blocked.riskLevel || '中'}风险` : match ? '受保护名单待复核' : '低风险', reviewPriority, sensitiveHits: blocked ? [blocked.term] : [], protectedListId: match?.list.id || null }); if (post) recordDaily(PrototypeData.ensureEngagement(post), 'comments'); PrototypeData.save(data); const postActions = { ...state.postActions, [id]: { ...(state.postActions[id] || {}), newComment: text, commented: true } }; setState({ postActions, replyTarget: '' }); showToast(requiresReview ? (reviewPriority === '优先' ? '评论已提交，进入优先人工审核。' : '评论已提交，等待人工审核。') : '评论已发布。'); },
-  openPostComposer() { if (state.session?.role !== 'staff') return showToast('请切换至职工视图发表帖子。'); setState({ postComposerOpen: true, editingPostId: null }); if (state.staffDisplayMode === 'mobile') requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, 0))); },
-  closePostComposer(event) { if (event && event.target !== event.currentTarget) return; setState({ postComposerOpen: false, editingPostId: null }); },
+  searchVoices() { setState({ voiceSearch: byId('voice-search')?.value.trim() || '' }); },
+  refreshVoices() { setState({ voiceSearch: '' }); showToast('已刷新'); },
+  openPasswordChange() { setState({ accountCenterOpen: true, accountCenterTab: 'security' }); },
+  updateComposerBoard() {
+    const board = PrototypeData.postingBoards().find((item) => item.id === byId('new-post-board')?.value);
+    const toggle = byId('new-post-allow-comments');
+    if (toggle) { toggle.disabled = !board || board.allowComments === false; toggle.checked = Boolean(board && board.allowComments !== false); }
+    const hint = byId('new-post-comment-hint');
+    if (hint) hint.textContent = !board ? '请先选择栏目；栏目关闭评论时此处不可开启。' : board.allowComments === false ? '该栏目已关闭评论。' : '栏目关闭评论时此处不可开启。';
+  },
+  toggleDraftBox() { setState({ composeBuffer: capturePostComposer(), draftBoxOpen: !state.draftBoxOpen }); },
+  editStaffDraft(id) {
+    const draft = staffDrafts().find((item) => item.id === id);
+    if (!draft) return showToast('草稿不存在');
+    setState({ postComposerOpen: true, editingPostId: null, editingDraftId: id, composeBuffer: null, draftBoxOpen: false });
+  },
+  deleteStaffDraft(id) {
+    if (!window.confirm('确定删除这条草稿？')) return;
+    persistStaffDrafts(staffDrafts().filter((item) => item.id !== id));
+    if (state.editingDraftId === id) { state.editingDraftId = null; state.composeBuffer = null; }
+    render(); showToast('草稿已删除');
+  },
+  ownerRecord(id, draft) {
+    if (!draft) return this.openPostProgress(id);
+    const item = staffDrafts().find((p) => p.id === id);
+    if (item) showToast(`草稿最近保存时间：${item.updatedAt}`);
+  },
+  ownerDelete(id, draft) {
+    if (draft) return this.deleteStaffDraft(id);
+    const data = PrototypeData.read();
+    const post = ownedStaffPosts(data).find((p) => String(p.id) === id);
+    if (!post || !window.confirm('确定删除这条帖子？删除后将不再展示。')) return;
+    post.deleted = true; post.enabled = false;
+    post.deletedBy = state.session.name + '（职工端）';
+    post.deletedAt = new Date().toLocaleString('sv-SE').slice(0,16);
+    post.history = [...(post.history || []), { text: '发帖人删除帖子', at: new Date().toLocaleString('sv-SE') }];
+    PrototypeData.save(data); render(); showToast('帖子已删除');
+  },
+  ownerSettings(id, draft) {
+    const data = PrototypeData.read();
+    const post = (draft ? staffDrafts() : ownedStaffPosts(data)).find((p) => String(p.id) === id);
+    if (!post) return;
+    const allowed = data.boards.find((b) => b.name === post.board)?.allowComments !== false && Boolean(post.board);
+    const dialog = document.createElement('dialog');
+    dialog.className = 'owner-settings-dialog';
+    dialog.innerHTML = `<form method="dialog"><header><h2>帖子设置</h2><button value="cancel" aria-label="关闭">×</button></header><fieldset><legend>发布身份</legend><label><input type="radio" name="identity" value="real" ${post.publicationMode !== 'anonymous' ? 'checked' : ''}>实名</label><label><input type="radio" name="identity" value="anonymous" ${post.publicationMode === 'anonymous' ? 'checked' : ''}>匿名</label></fieldset><label class="owner-comment-setting">允许评论<input type="checkbox" name="comments" ${allowed && post.allowComments !== false ? 'checked' : ''} ${allowed ? '' : 'disabled'}></label>${allowed ? '' : '<p>当前栏目未开放评论</p>'}<footer><button value="cancel">取消</button><button value="save" class="primary">保存</button></footer></form>`;
+    dialog.addEventListener('close', () => {
+      if (dialog.returnValue === 'save') {
+        post.publicationMode = dialog.querySelector('input[name="identity"]:checked').value;
+        post.allowComments = allowed && dialog.querySelector('[name="comments"]').checked;
+        if (draft) persistStaffDrafts(staffDrafts().map((p) => p.id === id ? { ...post, updatedAt: new Date().toLocaleString('sv-SE') } : p));
+        else { post.author = post.publicationMode === 'anonymous' ? '匿名职工' : state.session.name; post.authorId = state.session.id; PrototypeData.save(data); }
+        render(); showToast('设置已保存');
+      }
+      dialog.remove();
+    });
+    document.body.append(dialog); dialog.showModal();
+  },
+  savePostDraft() {
+    const draft = capturePostComposer();
+    if (!draft.title && !draft.body) return showToast('请填写标题或正文后保存');
+    const id = state.editingDraftId || 'draft-' + Date.now();
+    persistStaffDrafts([{ ...draft, id, authorId: state.session.id, updatedAt: new Date().toLocaleString('sv-SE', { hour12: false }) }, ...staffDrafts().filter((item) => item.id !== id)]);
+    setState({ postComposerOpen: false, editingDraftId: null, composeBuffer: null, draftBoxOpen: false }); showToast('草稿已保存');
+  },
+  openPostComposer() { if (state.session?.role !== 'staff') return showToast('请切换至职工视图发表帖子。'); setState({ postComposerOpen: true, editingPostId: null, editingDraftId: null, composeBuffer: null, draftBoxOpen: false }); if (state.staffDisplayMode === 'mobile') requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, 0))); },
+  closePostComposer(event) { if (event && event.target !== event.currentTarget) return; setState({ postComposerOpen: false, editingPostId: null, editingDraftId: null, composeBuffer: null, draftBoxOpen: false }); },
   handlePostAttachment(input) {
     const file = input.files?.[0], name = byId('new-post-attachment-name'), hint = byId('new-post-attachment-hint'), remove = byId('new-post-attachment-remove'), error = byId('post-compose-error');
     const message = getPostAttachmentError(file);
@@ -1152,10 +1511,11 @@ window.AppPrototype = {
       setState({ postComposerOpen: false, editingPostId: null });
       return showToast(requiresReview ? '发言已重新提交，等待人工审核。' : '发言已重新发布。');
     }
+    const savedDraft = state.composeBuffer || staffDrafts().find((item) => item.id === state.editingDraftId);
     const id = Date.now();
-    data.posts.unshift({ id, board: board.name, title, subtitle, body, author: identity === 'anonymous' ? '匿名职工' : (state.session?.name || '职工'), authorId: state.session?.id || 'staff', publicationMode: identity, attachment: attachmentFile ? { name: attachmentFile.name, size: attachmentFile.size, type: attachmentFile.type || '' } : null, allowComments: effectiveAllowComments, time: new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }), createdAt: updatedAt, updatedAt, status, contentAuditStatus: requiresReview ? '待审核' : '审核通过', publishStatus: requiresReview ? '未发布' : '已发布', handlingStatus: board.generatesAffair && !requiresReview ? '待处理' : '不适用', processingAccepted: false, enabled: true, deleted: false, risk: blocked ? `${blocked.riskLevel || '中'}风险` : '低风险', reviewPriority: blocked?.riskLevel === '中' ? '优先' : requiresReview ? '普通' : '', sensitiveHits: blocked ? [blocked.term] : [], protectedListId: match?.list.id || null, flowSnapshot: board.generatesAffair ? PrototypeData.flowFor(board.name, data) : null, engagement: PrototypeData.emptyEngagement() });
+    data.posts.unshift({ id, board: board.name, title, subtitle, body, author: identity === 'anonymous' ? '匿名职工' : (state.session?.name || '职工'), authorId: state.session?.id || 'staff', publicationMode: identity, attachment: attachmentFile ? { name: attachmentFile.name, size: attachmentFile.size, type: attachmentFile.type || '' } : savedDraft?.attachment || null, allowComments: effectiveAllowComments, time: new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }), createdAt: updatedAt, updatedAt, status, contentAuditStatus: requiresReview ? '待审核' : '审核通过', publishStatus: requiresReview ? '未发布' : '已发布', handlingStatus: board.generatesAffair && !requiresReview ? '待处理' : '不适用', processingAccepted: false, enabled: true, deleted: false, risk: blocked ? `${blocked.riskLevel || '中'}风险` : '低风险', reviewPriority: blocked?.riskLevel === '中' ? '优先' : requiresReview ? '普通' : '', sensitiveHits: blocked ? [blocked.term] : [], protectedListId: match?.list.id || null, flowSnapshot: board.generatesAffair ? PrototypeData.flowFor(board.name, data) : null, engagement: PrototypeData.emptyEngagement() });
     personalPostRecords[id] = { publication: status, reviewed: !requiresReview, shares: 0, reports: 0 };
-    PrototypeData.save(data); personalPostIds.unshift(id); setState({ postComposerOpen: false, editingPostId: null }); showToast(requiresReview ? '发言已提交，等待人工审核。' : '发言已发布。');
+    PrototypeData.save(data); if (state.editingDraftId) persistStaffDrafts(staffDrafts().filter((item) => item.id !== state.editingDraftId)); personalPostIds.unshift(id); setState({ postComposerOpen: false, editingPostId: null, editingDraftId: null, composeBuffer: null, draftBoxOpen: false }); showToast(requiresReview ? '发言已提交，等待人工审核。' : '发言已发布。');
   },
   setPortalTabByIndex(index) { const names = ['全部', ...new Set([...PrototypeData.read().boards.map((board) => board.name), ...portalPosts.map((post) => post.board)])]; setState({ portalTab: names[index] || '全部' }); },
   toggleReport(id) { setState({ reportPostId: state.reportPostId === id ? null : id, commentPostId: null }); },
@@ -1166,7 +1526,7 @@ window.AppPrototype = {
   exitStaffMobile() { setState({ session: null, view: 'login', authDisplayMode: 'mobile', staffDisplayMode: 'desktop', workspaceView: 'dashboard', mobilePersonalSection: null, postComposerOpen: false, personalEditOpen: false, policyDetailId: null }); },
   prefillRole(role) { const account = accounts.find((item) => item.role === role && item.status === 'approved'); setState({ view: 'login', staffDisplayMode: 'desktop', loginMode: 'password', error: '', notice: `已载入${roleMeta[role][0]}演示账号，可直接登录。` }); setTimeout(() => { if (byId('identifier')) { byId('identifier').value = account.id; byId('password').value = account.password; } }, 0); },
   openManagementWorkspace,
-  switchRole(role) { const account = accounts.find((item) => item.role === role && item.status === 'approved'); if (role === 'handler') return openHandlerWorkspace(account); setState({ session: account, staffDisplayMode: 'desktop', workspaceView: 'dashboard', rankModal: null, policyDetailId: null }); },
+  switchRole(role) { const account = accounts.find((item) => item.role === role && item.status === 'approved'); if (role === 'handler') return openHandlerWorkspace(account); applyMessageReadState(account.id); setState({ session: account, staffDisplayMode: 'desktop', workspaceView: 'dashboard', rankModal: null, policyDetailId: null }); },
   setWorkspaceView(workspaceView) { const nextView = workspaceView === 'policy' ? 'dashboard' : workspaceView; setState({ workspaceView: nextView, mobilePersonalSection: nextView === 'profile' ? state.mobilePersonalSection : null, rankModal: null, policyDetailId: null, policyQuestionOpen: false, myPolicyQuestionsOpen: false, hotPolicyOpen: false }); },
   openSearchResult(type, id) { const panel = byId('staff-search-results'); if (panel) panel.hidden = true; if (type === '政策') return setState({ workspaceView: 'policy', policyDetailId: null }); setState({ workspaceView: 'voices', expandedPostId: Number.isNaN(Number(id)) ? id : Number(id) }); },
   toggleProfileMenu() { setState({ profileOpen: !state.profileOpen }); },
@@ -1174,9 +1534,9 @@ window.AppPrototype = {
   closeAccountCenter(event) { if (event && event.target !== event.currentTarget) return; setState({ accountCenterOpen: false }); },
   setAccountCenterTab(tab) { setState({ accountCenterTab: ['basic','security','devices'].includes(tab) ? tab : 'basic' }); },
   saveAccountCenter() { const name = byId('account-center-name')?.value.trim(); if (!name) return showToast('请填写用户昵称'); const data = PrototypeData.read(), shared = data.accounts.find((item) => item.id === state.session.id); state.session.name = name; state.session.gender = document.querySelector('input[name="account-center-gender"]:checked')?.value || '未知'; if (shared) { shared.name = name; shared.gender = state.session.gender; PrototypeData.save(data); } setState({ accountCenterOpen: false }); showToast('个人信息已更新'); },
-  changeAccountPassword() { const oldPassword = byId('account-old-password')?.value, password = byId('account-new-password')?.value, confirm = byId('account-confirm-password')?.value; if (!oldPassword || !password || !confirm) return showToast('请完整填写密码信息'); if (oldPassword !== state.session.password) return showToast('原密码不正确'); if (password.length < 6) return showToast('新密码不能少于 6 位'); if (password !== confirm) return showToast('两次输入的新密码不一致'); state.session.password = password; showToast('密码修改成功'); },
+  changeAccountPassword() { const oldPassword = byId('account-old-password')?.value, password = byId('account-new-password')?.value, confirm = byId('account-confirm-password')?.value; if (!oldPassword || !password || !confirm) return showToast('请完整填写密码信息'); if (oldPassword !== state.session.password) return showToast('原密码不正确'); if (password.length < 8 || password.length > 32) return showToast('密码长度为 8 至 32 位'); if (password !== confirm) return showToast('两次输入的新密码不一致'); state.session.password = password; setState({ accountCenterOpen: false }); showToast('演示密码已修改，本次页面会话内生效'); },
   reviewAccount(id, status) { const account = accounts.find((item) => item.id === id); if (!account) return; account.status = status; render(); showToast(status === 'approved' ? `${account.name} 已审核通过，可登录平台。` : `${account.name} 已驳回。`); },
-  logout() { if (state.session) recordLogin(state.session.id, '成功', '退出登录', 'password'); setState({ view: 'login', session: null, staffDisplayMode: 'desktop', workspaceView: 'dashboard', profileOpen: false, accountCenterOpen: false, rankModal: null, policyDetailId: null, error: '', notice: '已安全退出登录。' }); },
+  logout() { if (state.session) recordLogin(state.session.id, '成功', '退出登录', 'password'); setState({ view: 'login', session: null, staffDisplayMode: 'desktop', workspaceView: 'dashboard', profileOpen: false, accountCenterOpen: false, rankModal: null, policyDetailId: null, noticeRead: {}, interactionRead: {}, replyRead: {}, error: '', notice: '已安全退出登录。' }); },
   notify() { showToast('该功能为原型演示，正式版本将进入对应业务模块。'); }
 };
 

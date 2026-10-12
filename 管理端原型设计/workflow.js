@@ -8,6 +8,15 @@
   const canPublish = () => ['platform', 'content'].includes(state.role);
   const canDispatch = () => ['platform', 'dispatch'].includes(state.role);
   const canHandle = () => ['platform', 'handler'].includes(state.role);
+  const isAnonymousPost = (post) => post?.publicationMode === 'anonymous' || /匿名/.test(post?.author || '');
+  const canViewRealIdentity = (data = db()) => {
+    const role = (data.roles || []).find((item) => item.id === state.role);
+    return role?.canViewRealIdentity ?? ['platform', 'leader'].includes(state.role);
+  };
+  const identityAccount = (data, post) => (data.accounts || []).find((account) => String(account.id) === String(post?.authorId));
+  const identityButton = (data, post) => isAnonymousPost(post) && canViewRealIdentity(data)
+    ? button(`${icon('eye')}查看真实信息`, 'identity-view', post.id, 'secondary')
+    : '';
   const flowForPost = (post, data) => post?.flowSnapshot || PrototypeData.flowFor(post?.board, data);
   const flowForAffair = (affair, data) => affair?.flowSnapshot || flowForPost(data.posts.find((post) => post.id === affair?.postId), data);
   const canFlowRole = (flow, field, fallback) => state.role === 'platform' || state.role === (flow?.[field] || fallback);
@@ -276,12 +285,11 @@
       const quickLinks = [
         ['content-review', '内容审核', '判断内容是否可以公开', 'shield-check'],
         ['handler-dispatch', '事项处理', '分类、归组、回复诉求', 'tags'],
-        ['echo', '回音壁管理', '维护公开反馈结果', 'megaphone'],
         ['leader-dashboard', '数据驾驶舱', '查看参与与办理趋势', 'chart-spline']
       ];
       const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
       const priority = data.affairs.filter((affair) => ['待处理', '处理中'].includes(affair.status)).sort((a, b) => affairAttentionRank(a) - affairAttentionRank(b)).slice(0, 5);
-      return heading('工作总览', '集中处理今天的审核、事项和公开任务，优先处理等待时间较长与重点事项。', `<div class="wb-head-meta"><span>${icon('calendar-days')}${today}</span><span>${icon('refresh-cw')}更新于 ${boardUpdateTime()}</span></div>`) +
+      return heading('运营工作台', '集中处理今天的审核、事项和公开任务，优先处理等待时间较长与重点事项。', `<div class="wb-head-meta"><span>${icon('calendar-days')}${today}</span><span>${icon('refresh-cw')}更新于 ${boardUpdateTime()}</span></div>`) +
         `<div class="wb-layout"><aside class="wb-left"><section class="wb-profile"><div class="wb-profile-top"><div class="wb-avatar">${roleInfo[state.role].avatar}</div><div><span>当前工作身份</span><h2>${safe(currentAccount().name)}</h2><p>${safe(roleInfo[state.role].label)} · ${safe(currentAccount().department || '平台管理组')}</p></div></div><div class="wb-profile-scope">${icon('building-2')}省社本级及授权组织<span>数据范围</span></div><div class="wb-mini-stats"><button data-action="nav" data-id="content-review"><strong>${pending}</strong><span>待审核</span></button><button data-action="nav" data-id="handler-dispatch"><strong>${waiting}</strong><span>待处理</span></button><button data-action="nav" data-id="handler-dispatch"><strong>${active}</strong><span>处理中</span></button><button data-action="nav" data-id="handler-dispatch"><strong>${pendingPublications}</strong><span>待公开</span></button></div></section><section class="wb-side-section"><header><h3>常用入口</h3><button class="text-link" data-action="nav" data-id="leader-dashboard">查看驾驶舱</button></header><div class="wb-quick-grid">${quickLinks.map(([page,label,note,symbol])=>`<button data-action="nav" data-id="${page}"><span class="wb-quick-icon">${icon(symbol)}</span><strong>${label}</strong><small>${note}</small></button>`).join('')}</div></section><section class="wb-side-section wb-scope-note"><header><h3>工作口径</h3></header><p>建言献策、心声诉求审核通过后进入事项处理；业务交流只做内容发布，不生成事项。</p></section></aside><main class="wb-center"><section class="wb-summary"></section><section class="wb-panel wb-todo" id="work-queue"><header><div><h2>待我处理</h2><p>六类任务均可直接进入处理，顶部总数与此处保持一致。</p></div></header><div class="wb-queue">${queue.map(([count,title,note,symbol,page,action])=>`<article><span class="wb-queue-icon">${icon(symbol)}</span><div><strong>${title}</strong><p>${note}</p></div><span class="wb-queue-count">${count}</span><button class="btn btn-sm ${count > 0 ? 'btn-primary' : 'btn-secondary'}" data-action="nav" data-id="${page}">${action}${icon('chevron-right')}</button></article>`).join('')}</div></section><section class="wb-panel wb-focus"><header><div><h2>需关注事项</h2><p>展示待处理和处理中的事项，优先处理等待时间较长、紧急和重点事项。</p></div><div class="wb-focus-order">${icon('list-filter')}按处理优先级排序</div></header><div class="wb-focus-list">${priority.map((item)=>`<button class="wb-focus-row" data-action="affair-view" data-id="${safe(item.id)}"><span class="wb-status-dot ${item.status === '待处理' ? 'is-waiting' : 'is-processing'}"></span><span><strong>${safe(item.title)}</strong><small>${safe(item.id)} · ${safe(item.category || '待分类')} ${topicForAffair(data, item.id) ? `· ${safe(topicForAffair(data, item.id).name)}` : ''}</small></span>${badgeFor(item.status)}${icon('chevron-right')}</button>`).join('') || '<div class="wb-empty">暂无待处理或处理中的事项</div>'}</div></section></main><aside class="wb-right"></aside></div>`;
     }
     return heading(state.role === 'leader' ? '领导驾驶舱' : '事项工作台', '按授权范围查看内容审核、事项分类和回复进度。') +
@@ -354,7 +362,7 @@
     });
     const countLabel = commentReviewTab === '待审核' ? '待审评论' : commentReviewTab === '已发布' ? '已发布评论' : '已驳回评论';
     const countSuffix = commentReviewTab === '待审核' ? '条待审' : commentReviewTab === '已发布' ? '条已发布' : '条已驳回';
-    return `<div class="comment-review-result"><div class="sensitive-result-head"><div class="result-title-with-tip"><strong>${safe(commentReviewTab)}记录</strong><span class="title-help" tabindex="0" aria-label="规则命中说明">${icon('circle-help')}<span class="title-help-popover">“规则命中”来自敏感词库的风险等级和命中词，仅作人工审核提示，不代表已判定违规。</span></span></div><span>共 ${groups.length} 个帖子、${source.length} 条评论</span></div>${list(['来源帖子', '栏目', countLabel, '规则命中', commentReviewTab === '待审核' ? '等待时间' : '最近提交', '操作'], groups.map((group) => `<tr><td><strong>${safe(group.post?.title || '来源帖子不可用')}</strong><div class="td-sub">发帖人：${safe(group.post?.author || '未记录')}</div></td><td>${badgeFor(group.post?.board || '原栏目')}</td><td><strong>${group.comments.length} ${countSuffix}</strong></td><td><div class="comment-risk-summary">${riskBadge(group.highestRisk)}<span><b>命中词：</b>${group.hits.length ? safe(group.hits.slice(0, 2).join('、')) : '受保护名单'}${group.hits.length > 2 ? ` 等 ${group.hits.length} 项` : ''}</span></div></td><td><strong>${safe(commentReviewTab === '待审核' ? commentWaitText(group.earliest) : group.latest)}</strong><div class="td-sub">${safe(group.latest)}</div></td><td><div class="row-actions">${button('帖子详情', 'post-detail', group.postId)}${button(commentReviewTab === '待审核' ? '审核评论' : '查看记录', 'comment-batch-detail', group.postId, commentReviewTab === '待审核' ? 'primary' : 'secondary')}</div></td></tr>`))}</div>`;
+    return `<div class="comment-review-result"><div class="sensitive-result-head"><div class="result-title-with-tip"><strong>${safe(commentReviewTab)}记录</strong><span class="title-help" tabindex="0" aria-label="规则命中说明">${icon('circle-help')}<span class="title-help-popover">“规则命中”来自敏感词库的风险等级和命中词，仅作人工审核提示，不代表已判定违规。</span></span></div><span>共 ${groups.length} 个帖子、${source.length} 条评论</span></div>${list(['来源帖子', '发帖人', '帖子编号', '栏目', '评论数', '风险等级', '命中词', '等待时长', '提交时间', '操作'], groups.map((group) => `<tr><td><strong>${safe(group.post?.title || '来源帖子不可用')}</strong></td><td>${safe(group.post?.author || '未记录')}</td><td>${safe(group.post?.id || group.postId)}</td><td>${badgeFor(group.post?.board || '原栏目')}</td><td><strong>${group.comments.length} ${countSuffix}</strong></td><td>${riskBadge(group.highestRisk)}</td><td><div class="comment-risk-summary"><span>${group.hits.length ? safe(group.hits.slice(0, 2).join('、')) : '受保护名单'}${group.hits.length > 2 ? ` 等 ${group.hits.length} 项` : ''}</span></div></td><td>${safe(commentReviewTab === '待审核' ? commentWaitText(group.earliest) : '—')}</td><td>${safe(group.latest)}</td><td><div class="row-actions">${button('帖子详情', 'post-detail', group.postId)}${button(commentReviewTab === '待审核' ? '审核评论' : '查看记录', 'comment-batch-detail', group.postId, commentReviewTab === '待审核' ? 'primary' : 'secondary')}</div></td></tr>`))}</div>`;
   }
   function posts() {
     const data = db();
@@ -394,10 +402,14 @@
     const resolved = data.reports.filter((report) => report.status === '已处理');
     const tabs = [['待核查', '待核查', pending.length], ['举报成立', '举报成立', resolved.filter((report) => report.resolution === '举报成立').length], ['举报不成立', '举报不成立', resolved.filter((report) => report.resolution === '举报不成立').length]];
     const categories = [...new Set(data.reports.map((report) => report.category).filter(Boolean))];
-    const rows = list(['来源帖子', '举报人数 / 记录', '举报原因类型', reportReviewTab === '待核查' ? '最早举报' : '核查结果', '操作'], groups.map((group) => `<tr><td><strong>${safe(group.post?.title || '来源帖子不可用')}</strong><div class="td-sub">${safe(group.post?.board || '栏目未记录')} · 发帖人：${safe(group.post?.author || '未记录')}</div></td><td><strong>${group.reporterCount} 位用户</strong><div class="td-sub">共 ${group.reports.length} 条举报记录</div></td><td><div class="report-category-list">${group.categories.map((category) => badgeFor(category)).join('')}</div></td><td>${reportReviewTab === '待核查' ? `<strong>${safe(commentWaitText(group.earliest))}</strong><div class="td-sub">${safe(group.earliest)}</div>` : `<strong>${safe(reportReviewTab)}</strong><div class="td-sub">${safe(group.reports[0]?.reviewedAt || '时间未记录')}</div>`}</td><td><div class="row-actions">${button('帖子详情', 'post-detail', group.postId)}${button(reportReviewTab === '待核查' ? '核查举报' : '查看结果', 'report-group-detail', group.postId, reportReviewTab === '待核查' ? 'primary' : 'secondary')}</div></td></tr>`));
+    const rows = list(['来源帖子', '栏目', '发帖人', '举报人数', '举报记录', '违规类型', '等待时长', '最早举报', '核查结果', '核查时间', '操作'], groups.map((group) => {
+      const post = group.post;
+      const resolved = reportReviewTab !== '待核查';
+      return `<tr><td><strong>${safe(post?.title || '来源帖子不可用')}</strong><div class="td-sub">${safe(post?.id || group.postId)}</div></td><td>${safe(post?.board || '栏目未记录')}</td><td><div class="identity-cell"><span>${safe(post?.author || '未记录')}</span>${identityButton(data, post)}</div></td><td>${group.reporterCount} 人</td><td>${group.reports.length} 条</td><td><div class="report-category-list">${group.categories.map((category) => badgeFor(category)).join('')}</div></td><td>${resolved ? '—' : safe(commentWaitText(group.earliest))}</td><td>${safe(group.earliest)}</td><td>${resolved ? badgeFor(reportReviewTab) : '—'}</td><td>${resolved ? safe(group.reports[0]?.reviewedAt || '—') : '—'}</td><td><div class="row-actions">${button(reportReviewTab === '待核查' ? '核查举报' : '查看结果', 'report-group-detail', group.postId, reportReviewTab === '待核查' ? 'primary' : 'secondary')}</div></td></tr>`;
+    }));
     return heading('举报核查', '按被举报内容归并核查举报原因，人工记录结论、处置意见并保留审计记录。', `<span class="badge red">待核查 ${pendingPosts} 个帖子 / ${pending.length} 条举报</span>`) +
       contentTabs(tabs, reportReviewTab, 'report-review-tab', '举报核查状态') +
-      `<div class="report-review-filters"><label>关键词<input class="input" id="wf-report-review-query" value="${safe(reportReviewFilters.query)}" placeholder="帖子标题、举报原因或举报人"></label><label>举报原因类型<select class="select" id="wf-report-review-category"><option value="">全部类型</option>${categories.map((category) => `<option ${reportReviewFilters.category === category ? 'selected' : ''}>${safe(category)}</option>`).join('')}</select></label><label>举报时间<div class="review-date-range"><input class="input" id="wf-report-review-from" type="date" value="${safe(reportReviewFilters.dateFrom)}"><em>至</em><input class="input" id="wf-report-review-to" type="date" value="${safe(reportReviewFilters.dateTo)}"></div></label><div class="report-review-filter-actions">${button('重置', 'report-review-reset', '')}<button class="btn btn-sm btn-primary" type="button" onclick="ManagementWorkflow.reportReviewSearch()">${icon('search')}查询</button></div></div><div class="report-review-result"><div class="sensitive-result-head"><div class="result-title-with-tip"><strong>${safe(reportReviewTab)}记录</strong><span class="title-help" tabindex="0" aria-label="举报核查说明">${icon('circle-help')}<span class="title-help-popover">举报原因类型由职工提交举报时选择，仅作为核查线索，最终结论由审核人员判断。</span></span></div><span>共 ${groups.length} 个帖子、${sourceReports.length} 条举报</span></div>${rows}</div>`;
+      `<div class="report-review-filters"><label>关键词<input class="input" id="wf-report-review-query" value="${safe(reportReviewFilters.query)}" placeholder="请输入"></label><div class="report-review-filter-actions">${button('重置', 'report-review-reset', '')}<button class="btn btn-sm btn-primary" type="button" onclick="ManagementWorkflow.reportReviewSearch()">${icon('search')}查询</button></div></div><div class="report-review-result"><div class="sensitive-result-head"><div class="result-title-with-tip"><strong>${safe(reportReviewTab)}记录</strong><span class="title-help" tabindex="0" aria-label="举报核查说明">${icon('circle-help')}<span class="title-help-popover">举报原因类型由职工提交举报时选择，仅作为核查线索，最终结论由审核人员判断。</span></span></div><span>共 ${groups.length} 个帖子、${sourceReports.length} 条举报</span></div>${rows}</div>`;
   }
   function traceQueryPage(review = false) {
     const data = db();
@@ -463,7 +475,7 @@
   }
   function contentLedger() {
     const data = db();
-    const categories = ['全部', '建言献策', '心声诉求', '业务交流', '回音壁'];
+    const categories = ['全部', '建言献策', '心声诉求', '业务交流', '回音壁', '回收站'];
     const selected = categories.includes(state.contentLedgerTab) ? state.contentLedgerTab : '全部';
     const sourceRows = data.posts.filter((post) => post.deleted !== true && auditStatus(post) === '审核通过' && ['建言献策', '心声诉求', '业务交流'].includes(post.board)).map((post) => { const affair = data.affairs.find((item) => String(item.postId) === String(post.id)); return { id: post.id, title: post.title, category: post.board, author: post.author, time: post.time, status: publicationStatus(post), affairStatus: contentAffairStatus(affair, post.board), action: 'post-detail', sourcePost: post, metrics: interactionSummary(post, postComments(data, post.id)) }; });
     const echoRows = managedEchoRecords(data).map((item) => ({ id: item.id, title: item.title, category: '回音壁', author: '平台管理组', time: item.publishedAt, status: item.status === '已发布' ? '已发布' : '未发布', affairStatus: '已回复', action: 'echo-view', metrics: interactionSummary(item, postComments(data, 6000 + Number(item.sourcePostId || 0))) }));
@@ -482,9 +494,22 @@
     contentLedgerPage = Math.min(contentLedgerPage, totalPages);
     const visible = filtered.slice((contentLedgerPage - 1) * pageSize, contentLedgerPage * pageSize);
     const tabs = categories.map((category) => [category, category, allRows.filter((item) => category === '全部' || item.category === category).length]);
+    const recycled = data.posts.filter((p) => p.deleted && !p.permanentlyDeleted);
+    tabs[tabs.length - 1][2] = recycled.length;
+    if (selected === '回收站') {
+      const f = state.recycleFilters || { query: '', source: '', from: '', to: '' };
+      const matched = recycled.filter((p) => {
+        const date = String(p.deletedAt || '').slice(0,10);
+        return (!f.query || `${p.title} ${p.id} ${p.deletedBy || ''}`.toLocaleLowerCase().includes(f.query.toLocaleLowerCase())) && (!f.source || String(p.deletedBy || '').includes(f.source)) && (!f.from || date >= f.from) && (!f.to || (date && date <= f.to));
+      });
+      const recycleFilters = `<form class="content-admin-filters" onsubmit="event.preventDefault();ManagementWorkflow.recycleSearch()"><label><span>关键词</span><input class="input" id="recycle-query" value="${safe(f.query)}" placeholder="标题、编号或删除人"></label><label><span>删除来源</span><select class="select" id="recycle-source"><option value="">全部来源</option>${['管理端', '职工端'].map((v) => `<option ${f.source === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label><label><span>删除时间</span><div class="review-date-range"><input class="input" id="recycle-from" type="date" value="${safe(f.from)}"><em>至</em><input class="input" id="recycle-to" type="date" value="${safe(f.to)}"></div></label><div class="content-admin-filter-actions">${button('重置', 'recycle-reset', '')}<button type="submit" class="btn btn-sm btn-primary">${icon('search')}查询</button></div></form>`;
+      const recycleRows = matched.map((p) => `<tr><td><strong>${safe(p.title)}</strong><div class="td-sub">#${safe(p.id)}</div></td><td>${safe(p.board)}</td><td>${safe(p.deletedBy || '历史删除')}</td><td>${safe(p.deletedAt || '未记录')}</td><td><div class="row-actions">${canManageLedger() ? button('恢复', 'recycle-restore', p.id) + button('彻底删除', 'recycle-purge', p.id, 'danger') : ''}</div></td></tr>`);
+      return heading('信息台账管理', '回收站中的内容不对职工展示，恢复后为未发布。') + contentTabs(tabs, selected, 'ledger-tab', '内容分类') + recycleFilters + list(['内容标题', '内容分类', '删除人', '删除时间', '操作'], recycleRows) + `<div class="content-admin-pager"><span>共 ${matched.length} 条</span></div>`;
+    }
     const filters = `<form class="content-admin-filters" onsubmit="event.preventDefault();ManagementWorkflow.contentLedgerSearch()"><label><span>关键词</span><input class="input" id="wf-ledger-query" value="${safe(contentLedgerFilters.query)}" placeholder="标题、编号或发布人"></label><label><span>发布状态</span><select class="select" id="wf-ledger-status"><option value="">全部状态</option>${['已发布', '未发布', '私密发布'].map((value) => `<option ${contentLedgerFilters.status === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label><label><span>发布时间</span><div class="review-date-range"><input class="input" id="wf-ledger-from" type="date" value="${safe(contentLedgerFilters.dateFrom)}"><em>至</em><input class="input" id="wf-ledger-to" type="date" value="${safe(contentLedgerFilters.dateTo)}"></div></label><div class="content-admin-filter-actions">${button('重置', 'ledger-reset', '')}<button class="btn btn-sm btn-primary" type="submit">${icon('search')}查询</button></div></form>`;
     const rows = visible.map((item) => {
-      const actions = item.sourcePost && canManageLedger() ? button('查看', item.action, item.id) + publicationActions(item.sourcePost) + button('删除', 'ledger-post-delete', item.id) : button('查看', item.action, item.id);
+      const chatButton = item.sourcePost && canManageLedger() ? `<button class="btn btn-sm" onclick="PrivateChat.open('${safe(item.id)}','admin','platform','平台管理员')">${icon('messages-square')}官方私信</button>` : '';
+      const actions = item.sourcePost && canManageLedger() ? button('查看', item.action, item.id) + chatButton + publicationActions(item.sourcePost) + button('删除', 'ledger-post-delete', item.id) : button('查看', item.action, item.id);
       return `<tr><td><strong>${safe(item.title)}</strong><div class="td-sub">${item.category === '回音壁' ? '回音壁公开回复' : `帖子 #${safe(item.id)}`}</div></td><td>${badgeFor(item.category)}</td><td>${safe(item.author)}</td><td>${safe(item.time)}</td><td>${interactionCell(item.metrics)}</td><td>${badgeFor(item.status)}<div class="td-sub">事项：${safe(item.affairStatus)}</div></td><td><div class="row-actions">${actions}</div></td></tr>`;
     });
     const pager = `<div class="content-admin-pager"><span>共 ${filtered.length} 条，第 ${contentLedgerPage}/${totalPages} 页</span><div>${button(`${icon('chevron-left')}上一页`, 'ledger-page', String(contentLedgerPage - 1), contentLedgerPage === 1 ? 'ghost' : 'secondary')}${button(`下一页${icon('chevron-right')}`, 'ledger-page', String(contentLedgerPage + 1), contentLedgerPage === totalPages ? 'ghost' : 'secondary')}</div></div>`;
@@ -498,7 +523,7 @@
       ? [['content', '内容信息'], ['history', '操作记录']]
       : [['content', '内容信息'], ['analysis', '互动分析'], ['comments', '评论明细'], ['history', '操作记录']];
     const selected = tabs.some(([key]) => key === state.postDetailTab) ? state.postDetailTab : 'content';
-    const content = `<dl class="post-detail-meta"><dt>帖子编号</dt><dd>${safe(post.id)}</dd><dt>发表栏目</dt><dd>${safe(post.board)}</dd><dt>发布作者</dt><dd>${safe(post.author)}</dd><dt>发布方式</dt><dd>${post.author === '匿名用户' ? '匿名发布 · 真实身份受独立溯源权限保护' : '实名发布'}</dd><dt>提交时间</dt><dd>${safe(post.time)}</dd><dt>审核状态</dt><dd>${badgeFor(contentReviewResult(post))}</dd><dt>发布状态</dt><dd>${badgeFor(contentPublishResult(post))}</dd><dt>事项处理状态</dt><dd>${badgeFor(contentHandlingResult(post, data))}</dd><dt>敏感词命中</dt><dd>${sensitiveWordBadges(post, data)}</dd></dl><div class="post-detail-copy"><h3>${safe(post.title)}</h3><p>${safe(post.body)}</p></div>${post.protectedListId ? `<div class="notice">${icon('shield-alert')}<div><strong>疑似涉及受保护名单</strong><p>关联规则：${safe(data.protectedLists?.find((item) => item.id === post.protectedListId)?.name || '已停用名单')}。仅供人工判断。</p></div></div>` : ''}`;
+    const content = `<dl class="post-detail-meta"><dt>帖子编号</dt><dd>${safe(post.id)}</dd><dt>发表栏目</dt><dd>${safe(post.board)}</dd><dt>发布作者</dt><dd>${safe(post.author)} ${identityButton(data, post)}</dd><dt>发布方式</dt><dd>${isAnonymousPost(post) ? '匿名发布 · 真实身份仅限授权人员查看' : '实名发布'}</dd><dt>提交时间</dt><dd>${safe(post.time)}</dd><dt>审核状态</dt><dd>${badgeFor(contentReviewResult(post))}</dd><dt>发布状态</dt><dd>${badgeFor(contentPublishResult(post))}</dd><dt>事项处理状态</dt><dd>${badgeFor(contentHandlingResult(post, data))}</dd><dt>敏感词命中</dt><dd>${sensitiveWordBadges(post, data)}</dd></dl><div class="post-detail-copy"><h3>${safe(post.title)}</h3><p>${safe(post.body)}</p></div>${post.protectedListId ? `<div class="notice">${icon('shield-alert')}<div><strong>疑似涉及受保护名单</strong><p>关联规则：${safe(data.protectedLists?.find((item) => item.id === post.protectedListId)?.name || '已停用名单')}。仅供人工判断。</p></div></div>` : ''}`;
     const rate = metrics.uniqueViews ? ((metrics.likes + metrics.comments + metrics.favorites + metrics.shares) / metrics.uniqueViews * 100).toFixed(1) : '0.0';
     const metricCards = [['浏览 PV', metrics.views], ['访客 UV', metrics.uniqueViews], ['点赞', metrics.likes], ['评论', metrics.comments], ['收藏', metrics.favorites], ['分享', metrics.shares]];
     const channels = engagement.shareChannels || {};
@@ -523,7 +548,7 @@
   function cockpitPostDetail(data, post) {
     const metrics = interactionSummary(post, postComments(data, post.id));
     const comments = postComments(data, post.id).filter((item) => item.status === '已发布').slice().reverse();
-    const body = `<article class="cockpit-post-reader"><header class="cockpit-post-reader-head"><div class="cockpit-post-reader-meta"><span>${safe(post.board || '帖子')}</span><i></i><small>${safe(post.author || '匿名用户')} · ${safe(post.time || '时间未记录')}</small></div><h2>${safe(post.title)}</h2></header><div class="cockpit-post-reader-copy"><p>${safe(post.body || post.excerpt || '暂无正文内容')}</p></div><div class="cockpit-post-reader-actions"><span>${icon('thumbs-up')} 点赞 ${metrics.likes}</span><span>${icon('message-circle')} 评论 ${metrics.comments}</span><span>${icon('star')} 收藏 ${metrics.favorites}</span><span>${icon('share-2')} 分享 ${metrics.shares}</span></div>${comments.length ? `<section class="cockpit-post-reader-comments"><header><h3>评论</h3><span>${comments.length} 条可见评论</span></header>${comments.slice(0, 8).map((item) => `<article><div><strong>${safe(item.author || '职工')}</strong><small>${safe(item.createdAt || '')}</small></div><p>${safe(item.text)}</p></article>`).join('')}</section>` : '<p class="cockpit-post-reader-empty">暂无公开评论</p>'}</article>`;
+    const body = `<article class="cockpit-post-reader"><header class="cockpit-post-reader-head"><div class="cockpit-post-reader-meta"><span>${safe(post.board || '帖子')}</span><i></i><small>${safe(post.author || '匿名用户')} · ${safe(post.time || '时间未记录')}</small></div><h2>${safe(post.title)}</h2>${isAnonymousPost(post) && canViewRealIdentity(data) ? `<div class="cockpit-identity-action">${identityButton(data, post)}<span>查看行为将自动记录</span></div>` : ''}</header><div class="cockpit-post-reader-copy"><p>${safe(post.body || post.excerpt || '暂无正文内容')}</p></div><div class="cockpit-post-reader-actions"><span>${icon('thumbs-up')} 点赞 ${metrics.likes}</span><span>${icon('message-circle')} 评论 ${metrics.comments}</span><span>${icon('star')} 收藏 ${metrics.favorites}</span><span>${icon('share-2')} 分享 ${metrics.shares}</span></div>${comments.length ? `<section class="cockpit-post-reader-comments"><header><h3>评论</h3><span>${comments.length} 条可见评论</span></header>${comments.slice(0, 8).map((item) => `<article><div><strong>${safe(item.author || '职工')}</strong><small>${safe(item.createdAt || '')}</small></div><p>${safe(item.text)}</p></article>`).join('')}</section>` : '<p class="cockpit-post-reader-empty">暂无公开评论</p>'}</article>`;
     const hotIndex = cockpitHotIds.indexOf(String(post.id));
     const hotNav = hotIndex >= 0
       ? `<span class="cockpit-hot-nav-status">第 ${hotIndex + 1} / ${cockpitHotIds.length} 篇热点诉求</span>${button('返回热点列表', 'cockpit-hot-list', '', 'ghost')}${button('上一篇', 'cockpit-hot-prev', post.id, 'secondary')}${button('下一篇', 'cockpit-hot-next', post.id, 'primary')}`
@@ -552,7 +577,7 @@
     const extraRiskLabels = risk.labels.filter((label) => !risk.hits.includes(label));
     const extraRisk = extraRiskLabels.length ? `<div class="content-evidence-extra"><span>其他风险标记</span>${extraRiskLabels.map((label) => `<strong>${safe(label)}</strong>`).join('')}</div>` : '';
     const riskTone = risk.level === '高' ? 'high' : risk.level === '中' ? 'medium' : 'low';
-    const body = `<div class="content-review-detail-grid"><article class="content-review-document"><header><div><span>${badgeFor(post.board)}</span><h2>${safe(post.title)}</h2><p>${safe(post.id)} · ${safe(post.author || '匿名用户')} · ${safe(post.time || '提交时间未记录')}</p></div></header><div class="content-review-copy">${safe(post.body || '暂无正文内容')}</div><section><h3>附件材料</h3><div class="content-evidence-empty">该内容未上传附件</div></section></article><aside class="content-review-inspector"><section class="content-evidence-section ${riskTone}"><header class="content-evidence-head"><h3>${icon(risk.level === '高' ? 'shield-alert' : 'scan-search')}敏感词检测 <span>${risk.hits.length}</span><span class="content-help-tip" tabindex="0" aria-label="系统检测说明">${icon('circle-help')}<i role="tooltip">系统检测仅作审核辅助，请结合正文语境判断。</i></span></h3><div class="content-risk-flags"><strong>${safe(risk.level)}风险</strong></div></header><div class="content-evidence-tags">${hitLabels}</div>${extraRisk}${post.protectedListId ? `<p>受保护名单：${safe(data.protectedLists?.find((item) => item.id === post.protectedListId)?.name || '已停用名单')}</p>` : ''}</section><section><h3>发布信息</h3><dl><dt>发布方式</dt><dd>${post.author === '匿名用户' ? '匿名发布' : '实名发布'}</dd><dt>审核状态</dt><dd>${safe(contentReviewResult(post))}</dd><dt>发布状态</dt><dd>${safe(contentState(post))}</dd></dl></section><section><h3>审核记录</h3>${events.length ? `<div class="ledger-history content-review-history">${reviewHistory}</div>` : '<div class="content-evidence-empty">暂无历史审核记录</div>'}</section></aside></div>`;
+    const body = `<div class="content-review-detail-grid"><article class="content-review-document"><header><div><span>${badgeFor(post.board)}</span><h2>${safe(post.title)}</h2><p>${safe(post.id)} · ${safe(post.author || '匿名用户')} · ${safe(post.time || '提交时间未记录')}</p></div></header><div class="content-review-copy">${safe(post.body || '暂无正文内容')}</div><section><h3>附件材料</h3><div class="content-evidence-empty">该内容未上传附件</div></section></article><aside class="content-review-inspector"><section class="content-evidence-section ${riskTone}"><header class="content-evidence-head"><h3>${icon(risk.level === '高' ? 'shield-alert' : 'scan-search')}敏感词检测 <span>${risk.hits.length}</span><span class="content-help-tip" tabindex="0" aria-label="系统检测说明">${icon('circle-help')}<i role="tooltip">系统检测仅作审核辅助，请结合正文语境判断。</i></span></h3><div class="content-risk-flags"><strong>${safe(risk.level)}风险</strong></div></header><div class="content-evidence-tags">${hitLabels}</div>${extraRisk}${post.protectedListId ? `<p>受保护名单：${safe(data.protectedLists?.find((item) => item.id === post.protectedListId)?.name || '已停用名单')}</p>` : ''}</section><section><h3>发布信息</h3><dl><dt>发布方式</dt><dd>${isAnonymousPost(post) ? '匿名发布' : '实名发布'}</dd><dt>审核状态</dt><dd>${safe(contentReviewResult(post))}</dd><dt>发布状态</dt><dd>${safe(contentState(post))}</dd></dl>${identityButton(data, post)}</section><section><h3>审核记录</h3>${events.length ? `<div class="ledger-history content-review-history">${reviewHistory}</div>` : '<div class="content-evidence-empty">暂无历史审核记录</div>'}</section></aside></div>`;
     const actions = pending && canAuditPost(post, data)
       ? button('驳回', 'post-decision-reject', post.id) + button('审核通过', 'post-decision-approve', post.id, 'primary')
       : button('关闭', 'close', '');
@@ -618,8 +643,11 @@
   }
   function contentRiskCell(post, data) {
     const risk = contentRisk(post, data);
-    const labels = risk.labels.length ? risk.labels.slice(0, 2).map((label) => `<span>${safe(label)}</span>`).join('') : '<span>未命中规则</span>';
-    return `<div class="content-risk-cell">${riskBadge(risk.level)}<div>${labels}<small>${safe(risk.suggestion)}</small></div></div>`;
+    const allLabels = risk.labels.length ? risk.labels : ['未命中规则'];
+    const visibleLabels = allLabels.slice(0, 1).join('、');
+    const extraCount = Math.max(0, allLabels.length - 1);
+    const summary = `${visibleLabels}${extraCount ? ` 等 ${allLabels.length} 项` : ''}`;
+    return `<div class="content-risk-cell" title="${safe(allLabels.join('、'))}">${riskBadge(risk.level)}<div><span class="content-risk-hit-summary">${safe(summary)}</span><small>${safe(risk.suggestion)}</small></div></div>`;
   }
   function contentReviewTable(data) {
     const rows = contentReviewRows(data);
@@ -630,9 +658,12 @@
       const pending = auditStatus(post) === '待审核';
       const actions = [button(pending ? '审核' : '详情', 'content-review-detail', post.id, pending ? 'primary' : 'secondary')];
       if (!pending && canManageLedger()) actions.push(button('删除', 'ledger-post-delete', post.id));
-      return `<tr class="${contentReviewSelection.has(String(post.id)) ? 'is-selected' : ''}">${pendingView ? `<td class="content-review-select"><input type="checkbox" aria-label="选择 ${safe(post.title)}" data-action="content-review-check" data-id="${safe(post.id)}" ${contentReviewSelection.has(String(post.id)) ? 'checked' : ''}></td>` : ''}<td><strong>${safe(post.title)}</strong><div class="td-sub">${safe(post.id)} · ${safe(post.body || '').slice(0, 42)}${String(post.body || '').length > 42 ? '…' : ''}</div></td><td>${badgeFor(post.board)}</td><td><strong>${safe(post.author || '匿名用户')}</strong></td><td>${contentRiskCell(post, data)}</td><td>${badgeFor(contentReviewResult(post))}</td><td>${badgeFor(contentPublishResult(post))}</td><td>${badgeFor(contentHandlingResult(post, data))}</td><td>${safe(post.time || '未记录')}</td><td><div class="row-actions">${actions.join('')}</div></td></tr>`;
+      const risk = contentRisk(post, data);
+      const priority = risk.level === '高' ? '高风险' : risk.level === '中' ? '优先' : '普通';
+      const waiting = post.waitingDays || post.waiting || '—';
+      return `<tr class="${contentReviewSelection.has(String(post.id)) ? 'is-selected' : ''}">${pendingView ? `<td class="content-review-select"><input type="checkbox" aria-label="选择 ${safe(post.title)}" data-action="content-review-check" data-id="${safe(post.id)}" ${contentReviewSelection.has(String(post.id)) ? 'checked' : ''}></td>` : ''}<td><strong>${safe(post.title)}</strong><div class="td-sub">${safe(post.id)} · ${safe(post.body || '').slice(0, 42)}${String(post.body || '').length > 42 ? '…' : ''}</div></td><td>${badgeFor(post.board)}</td><td><strong>${safe(post.author || '匿名用户')}</strong></td><td>${contentRiskCell(post, data)}</td><td>${badgeFor(priority)}</td><td>${badgeFor(contentReviewResult(post))}</td><td>${safe(post.time || '未记录')}</td><td>${safe(waiting)}</td><td><div class="row-actions">${actions.join('')}</div></td></tr>`;
     });
-    const columns = [...(pendingView ? [''] : []), '信息内容', '内容分类', '发布人', '风险提示', '审核状态', '发布状态', '事项处理状态', '提交时间', '操作'];
+    const columns = [...(pendingView ? [''] : []), '帖子', '栏目', '发布人', '敏感词命中', '优先级', '状态', '提交时间', '等待时长', '操作'];
     return batch + `<div class="table-wrap content-review-table"><table class="data-table"><thead><tr>${columns.map((column) => `<th>${column}</th>`).join('')}</tr></thead><tbody>${tableRows.join('') || `<tr><td colspan="${columns.length}" class="empty">暂无符合条件的审核记录</td></tr>`}</tbody></table></div>`;
   }
   function contentReview() {
@@ -688,7 +719,7 @@
       return button('查看回复', 'affair-view', affair.id) + (published ? '<span class="badge green">已发布回音壁</span>' : button('发布到回音壁', 'echo-publish', affair.id, 'primary'));
     };
     const selectable = ['待处理', '处理中'].includes(assignmentTab);
-    const columns = [...(selectable ? ['<input type="checkbox" data-action="affair-select-visible" aria-label="选择当前列表">'] : []), '事项名称 / 编号', '来源类型', ...(assignmentTab === '处理中' || assignmentTab === '已回复' ? ['事项分类', '关联专题'] : []), ...(assignmentTab === '已归档' ? ['生成时间', '归档理由', '归档时间', '归档操作人'] : [assignmentTab === '待处理' ? '生成时间' : assignmentTab === '处理中' ? '标记时间' : '回复时间']), '操作'];
+    const columns = [...(selectable ? ['<input type="checkbox" data-action="affair-select-visible" aria-label="选择当前列表">'] : []), '事项编号', '事项名称', '来源类型', ...(assignmentTab === '处理中' || assignmentTab === '已回复' ? ['事项分类', '关联专题'] : []), ...(assignmentTab === '已归档' ? ['生成时间', '归档理由', '归档时间', '归档操作人'] : [assignmentTab === '待处理' ? '生成时间' : assignmentTab === '处理中' ? '标记时间' : '回复时间']), ...(assignmentTab === '已回复' ? ['回音壁'] : []), '操作'];
     const rows = filteredItems.map((affair) => {
       const post = postForAffair(affair);
       const topic = topicForAffair(data, affair.id);
@@ -696,7 +727,8 @@
       const topicCell = topic ? `<button type="button" class="text-link affair-topic-link" data-action="affair-topic-view" data-id="${safe(topic.id)}">${safe(topic.name)}</button>` : '<span class="muted">未关联</span>';
       const processedFields = ['待处理', '已归档'].includes(assignmentTab) ? '' : `<td>${safe(affair.category || '待分类')}</td><td>${topicCell}</td>`;
       const archiveFields = assignmentTab === '已归档' ? `<td><strong>${safe(fullDateTime(affair.createdAt || affair.reviewedAt))}</strong></td><td>${safe(affair.archiveReason || '未记录')}</td><td><strong>${safe(fullDateTime(affair.archivedAt))}</strong></td><td>${safe(affair.archivedBy || '平台管理员')}</td>` : `<td><strong>${safe(fullDateTime(assignmentStageTime(affair)))}</strong></td>`;
-      return `<tr>${selectable ? `<td>${selector}</td>` : ''}<td><strong>${safe(affair.title)}</strong><div class="td-sub">${safe(affair.id)}</div></td><td>${badgeFor(affairType(affair, post))}</td>${processedFields}${archiveFields}<td><div class="row-actions">${assignmentAction(affair)}</div></td></tr>`;
+      const echoPublished = assignmentTab === '已回复' && (data.echoPublications || []).some((item) => String(item.affairId) === String(affair.id) && item.status === '已发布');
+      return `<tr>${selectable ? `<td>${selector}</td>` : ''}<td>${safe(affair.id)}</td><td><strong>${safe(affair.title)}</strong></td><td>${badgeFor(affairType(affair, post))}</td>${processedFields}${archiveFields}${assignmentTab === '已回复' ? `<td>${echoPublished ? badgeFor('已发布') : badgeFor('未发布')}</td>` : ''}<td><div class="row-actions">${assignmentAction(affair)}</div></td></tr>`;
     });
     const batchBar = selectable ? `<div class="affair-batch-toolbar"><span>已选择 <strong>${affairSelection.size}</strong> 项</span><div>${assignmentTab === '待处理' ? `${button('建立问题专题', 'affair-topic-create', '')}${button('加入已有专题', 'affair-topic-join', '')}` : ''}${assignmentTab === '处理中' ? button('统一回复', 'affair-batch-reply', '', 'primary') : ''}</div></div>` : '';
     let body;
@@ -930,12 +962,12 @@
     });
     const filters = `<form class="content-admin-filters compact" onsubmit="event.preventDefault();ManagementWorkflow.bannerSearch()"><label><span>关键词</span><input class="input" id="wf-banner-query" value="${safe(bannerFilters.query)}" placeholder="轮播标题或摘要"></label><label><span>使用状态</span><select class="select" id="wf-banner-status"><option value="">全部状态</option>${['已启用', '已停用', '关联失效'].map((value) => `<option ${bannerFilters.status === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label><div class="content-admin-filter-actions">${button('重置', 'banner-reset', '')}<button class="btn btn-sm btn-primary" type="submit">${icon('search')}查询</button></div></form>`;
     return heading('轮播图管理', '维护职工首页轮播内容和有效跳转；关联内容失效时编辑轮播图并重新选择跳转目标。', button('新增轮播图', 'banner-new', '', 'primary')) + filters +
-      list(['图片 / 标题', '跳转目标', '排序', '状态', '操作'], rows.map((item) => {
+      list(['图片', '标题', '摘要', '跳转类型', '跳转目标', '排序', '状态', '创建时间', '操作'], rows.map((item) => {
         const target = item.type === 'external' ? item.url : bannerTargets(data, item.type).find((entry) => String(entry.id) === String(item.targetId))?.title;
         const targetValid = item.type === 'external' ? /^https:\/\//.test(item.url || '') : Boolean(target);
         const status = !targetValid ? '关联失效' : item.enabled ? '已启用' : '已停用';
         const statusAction = targetValid ? button(item.enabled ? '停用' : '启用', 'banner-toggle', item.id) : '';
-        return `<tr><td><div class="banner-list-item"><img src="${safe(item.image)}" alt=""><strong>${safe(item.title)}</strong></div></td><td>${safe(bannerTypes[item.type] || '未知类型')}<div class="td-sub">${safe(target || '关联内容已下架，请编辑重新选择')}</div></td><td>${safe(item.sort)}</td><td>${badgeFor(status)}</td><td><div class="row-actions">${button('预览', 'banner-preview', item.id)}${button('编辑', 'banner-edit', item.id)}${statusAction}${button('删除', 'banner-delete', item.id)}</div></td></tr>`;
+        return `<tr><td><img class="banner-thumb" src="${safe(item.image)}" alt="${safe(item.title)}"></td><td><strong>${safe(item.title)}</strong></td><td>${safe(item.summary || '—')}</td><td>${safe(bannerTypes[item.type] || '未知类型')}</td><td>${safe(target || '关联内容已下架，请编辑重新选择')}</td><td>${safe(item.sort)}</td><td>${badgeFor(status)}</td><td>${safe(item.createdAt || '未记录')}</td><td><div class="row-actions">${button('预览', 'banner-preview', item.id)}${button('编辑', 'banner-edit', item.id)}${statusAction}${button('删除', 'banner-delete', item.id)}</div></td></tr>`;
       }));
   }
   function policyAndQuestions() {
@@ -1012,11 +1044,11 @@
     const selected = statuses.some(([value]) => value === state.userReviewTab) ? state.userReviewTab : 'pending';
     const departments = [...new Set(accounts.map((item) => item.department).filter(Boolean))];
     const visible = accounts.filter((a) => { const submitted = a.submitted || a.createdAt || ''; const queryText = `${a.id} ${a.name} ${a.phone} ${a.department}`.toLocaleLowerCase(); return a.status === selected && (!userReviewFilters.query || queryText.includes(userReviewFilters.query.toLocaleLowerCase())) && (!userReviewFilters.department || a.department === userReviewFilters.department) && (!userReviewFilters.dateFrom || submitted >= userReviewFilters.dateFrom) && (!userReviewFilters.dateTo || submitted <= userReviewFilters.dateTo + ' 23:59'); });
-    const filters = `<form class="user-review-filters" onsubmit="event.preventDefault();ManagementWorkflow.userReviewSearch()"><label><span>关键词</span><input class="input" id="wf-user-review-query" value="${safe(userReviewFilters.query)}" placeholder="姓名、手机号或申请编号"></label><label><span>申请部门</span><select class="select" id="wf-user-review-department"><option value="">全部部门</option>${departments.map((item) => `<option ${userReviewFilters.department === item ? 'selected' : ''}>${safe(item)}</option>`).join('')}</select></label><label><span>申请时间</span><div class="review-date-range"><input class="input" id="wf-user-review-from" type="date" value="${safe(userReviewFilters.dateFrom)}"><em>至</em><input class="input" id="wf-user-review-to" type="date" value="${safe(userReviewFilters.dateTo)}"></div></label><div class="user-review-filter-actions">${button('重置', 'user-review-reset', '')}<button class="btn btn-sm btn-primary" type="submit">查询</button></div></form>`;
+    const filters = `<form class="user-review-filters" onsubmit="event.preventDefault();ManagementWorkflow.userReviewSearch()"><label><span>手机号</span><input class="input" id="wf-user-review-query" value="${safe(userReviewFilters.query)}" placeholder="手机号"></label><div class="user-review-filter-actions">${button('重置', 'user-review-reset', '')}<button class="btn btn-sm btn-primary" type="submit">查询</button></div></form>`;
     return heading('用户审核', '核验职工注册申请；审核结果同步至职工端的申请状态查询。', `<span class="badge red">待审核 ${accounts.filter((a) => a.status === 'pending').length}</span>`) +
       filters +
       `<div class="review-status-tabs" role="tablist" aria-label="用户审核状态">${statuses.map(([value, label]) => `<button type="button" role="tab" aria-selected="${selected === value}" class="review-status-tab ${selected === value ? 'active' : ''}" data-action="user-review-tab" data-id="${value}">${label}<span>${accounts.filter((a) => a.status === value).length}</span></button>`).join('')}</div>` +
-      `<div class="user-review-result"><div class="sensitive-result-head"><strong>申请记录</strong><span>当前条件共 ${visible.length} 条</span></div>${list(['申请编号', '申请人', '联系方式', '申请部门', '申请时间', '审核状态', '操作'], visible.map((a) => `<tr><td><strong>${safe(applicationNo(a))}</strong></td><td><strong>${safe(a.name)}</strong></td><td>${safe(a.phone.slice(0, 3))}****${safe(a.phone.slice(-4))}</td><td>${safe(a.department || '未填写')}</td><td>${safe(a.submitted || a.createdAt || '未记录')}<div class="td-sub">${a.status === 'pending' ? '等待审核' : `处理于 ${safe(a.reviewedAt || '未记录')}`}</div></td><td>${badgeFor(selected === 'pending' ? '待审核' : selected === 'approved' ? '已通过' : '已驳回')}</td><td>${button(selected === 'pending' ? '审核申请' : '查看详情', 'account-review', a.id, selected === 'pending' ? 'primary' : 'secondary')}</td></tr>`))}</div>`;
+      `<div class="user-review-result"><div class="sensitive-result-head"><strong>用户注册申请</strong><span>当前条件共 ${visible.length} 条</span></div>${list(['申请人', '用户账号', '手机号', '所属组织', '申请时间', '审核状态', '等待时长', '操作'], visible.map((a) => `<tr><td><strong>${safe(a.name)}</strong></td><td>${safe(a.id)}</td><td>${safe(a.phone || '未记录')}</td><td>${safe(a.department || '未填写')}</td><td>${safe(a.submitted || a.createdAt || '未记录')}</td><td>${badgeFor(selected === 'pending' ? '待审核' : selected === 'approved' ? '已通过' : '已驳回')}</td><td>${selected === 'pending' ? safe(commentWaitText(a.submitted || a.createdAt)) : '—'}</td><td>${button(selected === 'pending' ? '审核申请' : '查看详情', 'account-review', a.id, selected === 'pending' ? 'primary' : 'secondary')}</td></tr>`))}</div>`;
   }
   function organization() {
     const nodes = db().organizations || [];
@@ -1455,6 +1487,15 @@
     if (type === 'post-detail' && post) return postDetail(data, post);
     if (type === 'cockpit-hot-list') return cockpitHotList(data);
     if (type === 'content-review-detail' && post) return contentReviewDetail(data, post);
+    if (type === 'identity-detail' && post) {
+      if (!isAnonymousPost(post) || !canViewRealIdentity(data)) return '';
+      const account = identityAccount(data, post);
+      const phone = account?.phone || '';
+      const identity = account
+        ? `<div class="identity-profile"><span>${safe(account.name.slice(0, 1))}</span><div><strong>${safe(account.name)}</strong><p>${safe(account.department || '所属单位未记录')} · ${safe(account.id)}</p></div>${badgeFor('已核验')}</div><dl class="post-detail-meta"><dt>真实姓名</dt><dd>${safe(account.name)}</dd><dt>所属单位 / 部门</dt><dd>${safe(account.department || '未记录')}</dd><dt>联系电话</dt><dd>${safe(phone || '未记录')}</dd><dt>账号编号</dt><dd>${safe(account.id)}</dd><dt>内容编号</dt><dd>${safe(post.id)}</dd><dt>发布时间</dt><dd>${safe(post.time || '未记录')}</dd></dl>`
+        : '<div class="notice">' + icon('circle-alert') + '<div><strong>实名账号记录不可用</strong><p>该匿名内容未关联有效账号，请联系平台管理员核对数据。</p></div></div>';
+      return modal('匿名用户真实信息', `<div class="identity-security-note">${icon('shield-check')}<div><strong>授权查看</strong><p>仅限履职使用，本次查看已自动写入系统审计日志。</p></div></div>${identity}`, button('关闭', 'close', '')).replace('<section class="modal"', '<section class="modal identity-detail-modal"');
+    }
     if (type === 'content-review-batch-return') {
       const selected = data.posts.filter((item) => contentReviewSelection.has(String(item.id)) && auditStatus(item) === '待审核');
       if (!selected.length) return modal('批量驳回', '<p>当前没有可批量处理的内容，请重新选择。</p>', button('关闭', 'close', ''));
@@ -1700,6 +1741,18 @@
     return '';
   }
   function act(action, id) {
+    if (action === 'identity-view') {
+      const data = db(), post = data.posts.find((item) => String(item.id) === String(id));
+      if (!post || !isAnonymousPost(post)) return showToast('该内容不是匿名发布内容');
+      if (!canViewRealIdentity(data)) return showToast('当前角色没有查看匿名用户真实信息的权限');
+      const account = identityAccount(data, post);
+      data.audit ||= [];
+      data.audit.unshift({ action: '匿名身份查看', target: post.id, detail: `查看匿名内容 #${post.id} 的真实信息${account ? ` · ${account.name} · ${account.department}` : ' · 账号记录不可用'}`, actorId: currentAccount().id, role: roleInfo[state.role].label, at: time() });
+      PrototypeData.save(data);
+      state.modal = { type: 'identity-detail', id: String(post.id) };
+      render();
+      return;
+    }
     if (action === 'banner-save') {
       if (!canPublish()) return showToast('当前角色无权管理轮播图');
       const data = db(), existing = (data.banners || []).find((item) => String(item.id) === id);
@@ -1925,6 +1978,23 @@
     if (action === 'user-review-tab') { state.userReviewTab = id; return render(); }
     if (action === 'user-review-reset') { userReviewFilters = { query: '', department: '', dateFrom: '', dateTo: '' }; return render(); }
     if (action === 'ledger-tab') { state.contentLedgerTab = id; contentLedgerPage = 1; return render(); }
+    if (action === 'recycle-reset') { state.recycleFilters = null; return render(); }
+    if (['recycle-restore', 'recycle-purge'].includes(action)) {
+      if (!canManageLedger()) return showToast('无权操作回收站');
+      const data = db(), post = data.posts.find((p) => String(p.id) === String(id) && p.deleted && !p.permanentlyDeleted);
+      if (!post) return showToast('记录不存在');
+      if (action === 'recycle-restore') {
+        if (!window.confirm(`确定恢复「${post.title}」？\n\n恢复后帖子将移回信息台账，发布状态为“未发布”，不会自动展示给职工。关联办理记录保留；需管理员手动发布后才会展示。`)) return;
+        Object.assign(post, { deleted: false, enabled: true, status: '已隐藏', publishStatus: '未发布' });
+      } else {
+        if (!window.confirm(`彻底删除「${post.title}」？此操作不可恢复。`)) return;
+        post.permanentlyDeleted = true;
+        // Keep only a tombstone so demo seed hydration cannot recreate the post.
+        data.posts = data.posts.map((p) => p === post ? { id: p.id, deleted: true, permanentlyDeleted: true, enabled: false, status: '已隐藏', publishStatus: '未发布' } : p);
+      }
+      data.audit.unshift({ action: '回收站', target: post.id, detail: action === 'recycle-restore' ? '恢复帖子为未发布' : '彻底删除帖子', at: time(), role: roleInfo[state.role].label });
+      PrototypeData.save(data); render(); return showToast(action === 'recycle-restore' ? '已恢复，当前未发布' : '已彻底删除');
+    }
     if (action === 'ledger-reset') { contentLedgerFilters = { query: '', type: '', status: '', dateFrom: '', dateTo: '' }; contentLedgerPage = 1; return render(); }
     if (action === 'ledger-page') { const page = Number(id); if (Number.isInteger(page) && page > 0) contentLedgerPage = page; return render(); }
     if (action === 'announcement-reset') { announcementFilters = { query: '', scope: '', status: '' }; return render(); }
@@ -1995,8 +2065,9 @@
         post.enabled = post.enabled === false;
         detail = `${post.enabled ? '启用' : '禁用'}帖子：${post.title}`;
       } else if (action === 'ledger-post-remove') {
-        if (data.affairs.some((affair) => String(affair.postId) === String(post.id))) return showToast('该帖子已关联办理事项，不能删除');
         post.deleted = true;
+        post.deletedBy = currentAccount().name + '（管理端）';
+        post.deletedAt = time();
         detail = `删除帖子：${post.title}`;
       } else return;
       data.audit.unshift({ action: '信息台账管理', target: post.id, detail, role: roleInfo[state.role].label, at: time() });
@@ -2450,12 +2521,13 @@
     const trigger = event.target.closest('[data-action]');
     if (!trigger) return;
     if (trigger.classList.contains('modal-backdrop') && event.target !== trigger) return;
-    if (!canEdit() && !['close', 'nav', 'staff', 'post-detail', 'post-detail-tab', 'cockpit-post-detail', 'affair-detail', 'affair-topic-view', 'cockpit-topic-workbench', 'echo-view', 'cockpit-jump', 'cockpit-hot-more', 'cockpit-hot-list', 'cockpit-hot-prev', 'cockpit-hot-next', 'leader-period-set', 'leader-period-apply', 'leader-export-excel'].includes(trigger.dataset.action)) return showToast('领导视图仅支持查看');
+    if (!canEdit() && !['close', 'nav', 'staff', 'post-detail', 'post-detail-tab', 'cockpit-post-detail', 'identity-view', 'affair-detail', 'affair-topic-view', 'cockpit-topic-workbench', 'echo-view', 'cockpit-jump', 'cockpit-hot-more', 'cockpit-hot-list', 'cockpit-hot-prev', 'cockpit-hot-next', 'leader-period-set', 'leader-period-apply', 'leader-export-excel'].includes(trigger.dataset.action)) return showToast('领导视图仅支持查看');
     act(trigger.dataset.action, trigger.dataset.id || '');
   });
   window.ManagementWorkflow = {
     selectWorkbenchTab(tab) { if (['全部', '办理中', '办理中-逾期', '办理中-延期', '退回修改'].includes(tab)) { workbenchTab = tab; render(); } },
     bannerTargetOptions(type) { const container = document.getElementById('wf-banner-target-field'); if (container) container.innerHTML = bannerTargetField(db(), type); },
+    recycleSearch() { const from = document.getElementById('recycle-from').value, to = document.getElementById('recycle-to').value; if (from && to && from > to) return showToast('开始日期不能晚于结束日期'); state.recycleFilters = { query: document.getElementById('recycle-query').value.trim(), source: document.getElementById('recycle-source').value, from, to }; render(); },
     contentLedgerSearch() { contentLedgerFilters = { ...contentLedgerFilters, query: readField('ledger-query'), status: readField('ledger-status'), dateFrom: readField('ledger-from'), dateTo: readField('ledger-to') }; contentLedgerPage = 1; render(); },
     announcementSearch() { announcementFilters = { query: readField('announcement-query'), scope: readField('announcement-scope'), status: readField('announcement-status') }; render(); },
     policySearch() { policyFilters = { query: readField('policy-query'), category: readField('policy-category'), status: readField('policy-status') }; render(); },

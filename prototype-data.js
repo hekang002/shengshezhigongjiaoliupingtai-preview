@@ -93,7 +93,7 @@
     ['干部任免信息发布规范建议', '建言献策', '江城行者', '未公开干部任免名单'],
     ['单位内部资料外发审批建议', '业务交流', '合作之声', '涉密文件原件'],
     ['关于礼金登记和监督机制的建议', '心声诉求', '廉洁同行', '违规收受礼金']
-  ].map(([title, board, author, term], index) => ({ id: `POST-DEMO-${String(index + 1).padStart(3, '0')}`, title, board, author, status: index < 12 ? '待审核' : index < 16 ? '已发布' : index < 18 ? '退回修改' : '已驳回', risk: '敏感词命中', sensitiveHits: [term], body: reviewBodyByTerm[term], time: `09月${String(13 - Math.floor(index / 5)).padStart(2, '0')}日 ${String(8 + index % 9).padStart(2, '0')}:15` }));
+  ].map(([title, board, author, term], index) => ({ id: `POST-DEMO-${String(index + 1).padStart(3, '0')}`, title, board, author, ...(author === '匿名用户' ? { authorId: 'staff', publicationMode: 'anonymous' } : {}), status: index < 12 ? '待审核' : index < 16 ? '已发布' : index < 18 ? '退回修改' : '已驳回', risk: '敏感词命中', sensitiveHits: [term], body: reviewBodyByTerm[term], time: `09月${String(13 - Math.floor(index / 5)).padStart(2, '0')}日 ${String(8 + index % 9).padStart(2, '0')}:15` }));
   const emptyEngagement = () => ({
     views: 0,
     uniqueViews: 0,
@@ -129,6 +129,7 @@
     return '已发布';
   }
   function deriveWorkflowPublishStatus(post, affair) {
+    if (post.publishStatus === '未发布' || post.status === '已隐藏') return '未发布';
     if (!needsSensitiveReview(post)) return '已发布';
     return derivePublishStatus(post);
   }
@@ -167,7 +168,7 @@
       const handlingStatus = deriveHandlingStatus(post, affair);
       if (post.contentAuditStatus !== contentAuditStatus) { post.contentAuditStatus = contentAuditStatus; changed = true; }
       if (post.publishStatus !== publishStatus) { post.publishStatus = publishStatus; changed = true; }
-      if (!needsSensitiveReview(post) && post.status !== '已发布') { post.status = '已发布'; changed = true; }
+      if (!needsSensitiveReview(post) && publishStatus === '已发布' && post.status !== '已发布') { post.status = '已发布'; changed = true; }
       if (post.handlingStatus !== handlingStatus) { post.handlingStatus = handlingStatus; changed = true; }
     }
     return changed;
@@ -425,11 +426,11 @@
       { id: 'rejected', phone: '13700002026', name: '孙晨', department: '经济发展处', status: 'rejected', role: 'staff', submitted: '2026-09-09 14:18', createdAt: '2026-09-09 14:18' }
     ], audit: [], loginLogs: [],
     roles: [
-      { id: 'platform', name: '平台管理员', key: 'platform', scope: '全部数据', sort: 1, enabled: true, createdAt: '2026-09-10 09:00', fixed: true },
-      { id: 'content', name: '内容管理员', key: 'content', scope: '授权组织', sort: 2, enabled: true, createdAt: '2026-09-10 09:00', fixed: true },
-      { id: 'dispatch', name: '事项管理员', key: 'dispatch', scope: '授权组织', sort: 3, enabled: true, createdAt: '2026-09-10 09:00', fixed: true },
-      { id: 'handler', name: '历史承办角色（停用）', key: 'handler', scope: '所属部门', sort: 4, enabled: false, createdAt: '2026-09-10 09:00', fixed: true },
-      { id: 'leader', name: '领导查看', key: 'leader', scope: '授权组织', sort: 5, enabled: true, createdAt: '2026-09-10 09:00', fixed: true }
+      { id: 'platform', name: '平台管理员', key: 'platform', scope: '全部数据', canViewRealIdentity: true, sort: 1, enabled: true, createdAt: '2026-09-10 09:00', fixed: true },
+      { id: 'content', name: '内容管理员', key: 'content', scope: '授权组织', canViewRealIdentity: false, sort: 2, enabled: true, createdAt: '2026-09-10 09:00', fixed: true },
+      { id: 'dispatch', name: '事项管理员', key: 'dispatch', scope: '授权组织', canViewRealIdentity: false, sort: 3, enabled: true, createdAt: '2026-09-10 09:00', fixed: true },
+      { id: 'handler', name: '历史承办角色（停用）', key: 'handler', scope: '所属部门', canViewRealIdentity: false, sort: 4, enabled: false, createdAt: '2026-09-10 09:00', fixed: true },
+      { id: 'leader', name: '领导查看', key: 'leader', scope: '授权组织', canViewRealIdentity: true, sort: 5, enabled: true, createdAt: '2026-09-10 09:00', fixed: true }
     ],
     menus: [
       { id: 'menu-dashboard', parentId: null, name: '工作总览', icon: 'layout-dashboard', sort: 1, type: '目录', permission: '', path: 'dashboard', enabled: true, visible: true, createdAt: '2026-09-10 09:00' },
@@ -498,7 +499,7 @@
   });
   function applyDemoScenario(data, scenario) {
     const mode = ['mixed', 'pending', 'processing', 'replied'].includes(scenario) ? scenario : 'mixed';
-    if (mode === 'mixed') return data;
+    if (mode === 'mixed') { data.__demoScenario = mode; return data; }
     data.affairs.forEach((affair, index) => {
       if (mode === 'pending') {
         Object.assign(affair, { status: '待处理', assignmentState: '待处理', category: '', topicTags: [], isKey: false, repliedAt: '', draft: '' });
@@ -534,6 +535,19 @@
           return scenarioData;
         }
         const defaults = initial();
+        if (!raw.recycleFixtureVersion) {
+          const samples = [
+            ['RECYCLE-DEMO-01', '关于机关停车位预约规则的建议', '建言献策', '张晓雨', '张晓雨（职工端）', '2026-10-12 09:20', '建议优化停车位预约时间，减少重复预约。'],
+            ['RECYCLE-DEMO-02', '县域冷链配送线路交流', '业务交流', '江城行者', '王敏（管理端）', '2026-10-11 16:35', '整理县域冷链配送线路的运行经验，供网点交流参考。'],
+            ['RECYCLE-DEMO-03', '职工食堂晚餐供应意见', '心声诉求', '匿名职工', '王敏（管理端）', '2026-10-11 14:10', '希望结合加班情况调整晚餐供应时段。'],
+            ['RECYCLE-DEMO-04', '基层网点培训资料共享建议', '建言献策', '张晓雨', '张晓雨（职工端）', '2026-10-10 11:45', '建议建立培训资料共享目录，方便基层网点查询。']
+          ];
+          for (const [id, title, board, author, deletedBy, deletedAt, body] of samples) {
+            if (!raw.posts.some((p) => p.id === id)) raw.posts.push({ id, title, board, author, authorId: author === '张晓雨' || author === '匿名职工' ? 'staff' : 'demo-author:江城行者', body, time: deletedAt, deleted: true, enabled: false, deletedBy, deletedAt, status: '已隐藏', publishStatus: '未发布', contentAuditStatus: '审核通过', sensitiveHits: [], history: [{ text: `${deletedBy}删除帖子`, at: deletedAt }] });
+          }
+          raw.recycleFixtureVersion = 1;
+          localStorage.setItem(key, JSON.stringify(raw));
+        }
         if (!Array.isArray(raw.boards)) raw.boards = defaults.boards;
         const wordsMissing = !Array.isArray(raw.sensitiveWords);
         if (wordsMissing) raw.sensitiveWords = defaults.sensitiveWords;
@@ -604,6 +618,7 @@
         for (const post of raw.posts) {
           if (!Object.hasOwn(post, 'enabled')) { post.enabled = true; dataChanged = true; }
           if (!Object.hasOwn(post, 'deleted')) { post.deleted = false; dataChanged = true; }
+          if (post.author === '匿名用户' && !post.authorId) { post.authorId = 'staff'; post.publicationMode = 'anonymous'; dataChanged = true; }
           if (!Array.isArray(post.sensitiveHits) && post.risk === '个人信息') { post.sensitiveHits = ['个人信息']; dataChanged = true; }
           const before = JSON.stringify(post.engagement || null);
           ensureEngagement(post);

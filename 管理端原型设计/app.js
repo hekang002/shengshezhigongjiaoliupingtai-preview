@@ -58,22 +58,22 @@ const handlerNav = [
   ];
 const navByRole = {
   platform: [
-    ['工作总览', [['dashboard', '日常工作台', 'gauge']]],
+    ['运营工作台', [['dashboard', '运营工作台', 'gauge']]],
     ['数据统计', leaderNav],
-    ['内容管理', [['content-ledger', '信息台账管理', 'notebook-tabs'], ['announcements', '通知公告管理', 'megaphone'], ['banners', '轮播图管理', 'images'], ['echo', '回音壁管理', 'badge-check']]],
+    ['内容管理', [['content-ledger', '信息台账管理', 'notebook-tabs'], ['dialog-messages', '私信消息管理', 'messages-square'], ['announcements', '通知公告管理', 'megaphone'], ['banners', '轮播图管理', 'images']]],
     ['事项办理', [['handler-dispatch', '事项处理', 'tags']]],
     ['审核管理', [['content-review', '信息内容审核', 'shield-check'], ['comments', '评论审核', 'message-square'], ['report-review', '举报核查', 'flag-triangle-right'], ['user-review', '用户审核', 'user-round-check']]],
     ['配置管理', [['categories', '栏目管理', 'panels-top-left'], ['sensitive', '敏感词库', 'scan-text'], ['base-config', '基础配置', 'shield-check']]],
-    ['系统设置', [['users', '用户管理', 'users'], ['organization', '组织架构', 'network'], ['permissions', '角色管理', 'key-round'], ['menu-management', '菜单管理', 'panels-top-left'], ['dictionary-management', '字典管理', 'book-open'], ['logs', '系统日志', 'scroll-text']]],
+    ['系统设置', [['users', '用户管理', 'users'], ['organization', '组织架构', 'network'], ['permissions', '角色管理', 'key-round'], ['positions', '岗位管理', 'briefcase-business'], ['menu-management', '菜单管理', 'panels-top-left'], ['dictionary-management', '字典管理', 'book-open'], ['logs', '系统日志', 'scroll-text']]],
   ],
   content: [
-    ['工作总览', [['dashboard', '日常工作台', 'gauge']]],
+    ['运营工作台', [['dashboard', '运营工作台', 'gauge']]],
     ['审核管理', [['content-review', '信息内容审核', 'shield-check'], ['comments', '评论审核', 'message-square'], ['report-review', '举报核查', 'flag-triangle-right']]],
-    ['内容管理', [['content-ledger', '信息台账管理', 'notebook-tabs'], ['announcements', '通知公告管理', 'megaphone'], ['banners', '轮播图管理', 'images'], ['echo', '回音壁管理', 'badge-check']]],
+    ['内容管理', [['content-ledger', '信息台账管理', 'notebook-tabs'], ['dialog-messages', '私信消息管理', 'messages-square'], ['announcements', '通知公告管理', 'megaphone'], ['banners', '轮播图管理', 'images']]],
     ['配置管理', [['categories', '栏目管理', 'panels-top-left'], ['sensitive', '敏感词库', 'scan-text']]],
   ],
   dispatch: [
-    ['工作总览', [['dashboard', '日常工作台', 'gauge']]],
+    ['运营工作台', [['dashboard', '运营工作台', 'gauge']]],
     ['事项办理', [['handler-dispatch', '事项处理', 'tags'], ['rectifications', '整改台账', 'list-checks']]],
     ['分析与协同', [['statistics', '办理统计', 'chart-no-axes-combined'], ['audit', '操作留痕', 'scroll-text']]],
   ],
@@ -144,6 +144,7 @@ function renderNav() {
   const handlerDept = (handlerAccountId ? data?.accounts.find((account) => account.id === handlerAccountId && account.role === 'handler' && account.status === 'approved') : data?.accounts.find((account) => account.role === 'handler' && account.status === 'approved'))?.department;
   const counts = data ? { review: data.posts.filter((p) => p.sensitiveHits?.length && p.contentAuditStatus === '待审核').length, comments: new Set(data.comments.filter((c) => c.status === '待审核' && c.sensitiveHits?.length).map((c) => String(c.postId))).size, 'report-review': data.reports.filter((r) => r.status === '待核查').length, 'content-review': data.posts.filter((p) => ['建言献策', '心声诉求', '业务交流'].includes(p.board) && (state.role !== 'content' || p.board !== '业务交流') && p.sensitiveHits?.length && p.contentAuditStatus === '待审核').length, assignments: data.affairs.filter((a) => a.status === '待处理').length, 'user-review': (data.accounts || []).filter((a) => a.status === 'pending').length } : {};
   const groupIcons = { '工作总览': 'layout-dashboard', '审核管理': 'user-round-check', '溯源查询': 'search-check', '系统设置': 'settings-2', '内容管理': 'files', '事项办理': 'clipboard-list', '承办管理': 'briefcase-business', '整改与公开': 'badge-check', '内容运营': 'megaphone', '数据分析': 'chart-no-axes-combined', '配置管理': 'sliders-horizontal', '分析与协同': 'chart-no-axes-combined', '承办工作台': 'briefcase-business', '部门数据': 'folder-open', '数据统计': 'chart-spline', '领导视图': 'chart-spline' };
+  counts['dialog-messages'] = window.PrivateChat?.unreadCount() || 0;
   return groups.map(([group, items], index) => {
     const expanded = state.expandedNavGroup === index;
     const current = items.some(([page]) => page === state.page);
@@ -194,9 +195,9 @@ function renderHandling() {
 }
 
 function renderPermissions() {
-  const permissions = ['运营工作台','帖子审核','评论审核','事项分办','办理管理','整改台账','回音壁管理','用户与组织','角色权限','数据统计','匿名溯源','操作日志','安全运维'];
+  const permissions = ['运营工作台','帖子审核','评论审核','事项分办','办理管理','整改台账','用户与组织','角色权限','数据统计','匿名溯源','操作日志','安全运维'];
   const role = state.activePermissionRole;
-  const can = { content: ['运营工作台','帖子审核','评论审核','栏目管理','公告管理','政策与问答','回音壁管理'], dispatch: ['运营工作台','事项分办','办理管理','整改台账','回音壁管理','数据统计','操作日志'], platform: permissions, handler: ['运营工作台','办理管理','回音壁管理','数据统计'], leader: ['运营工作台','数据统计','办理管理','回音壁管理'] }[role];
+  const can = { content: ['运营工作台','帖子审核','评论审核','栏目管理','公告管理','政策与问答'], dispatch: ['运营工作台','事项分办','办理管理','整改台账','数据统计','操作日志'], platform: permissions, handler: ['运营工作台','办理管理','数据统计'], leader: ['运营工作台','数据统计','办理管理'] }[role];
   return `${pageHead('角色与权限','角色决定可执行的业务动作，数据范围决定可见的组织和事项；同一用户可拥有多个角色。', `<button class="btn btn-secondary" onclick="showToast('权限变更已保存至草稿')">${icon('save')}保存配置</button><button class="btn btn-primary" onclick="openModal('role')">${icon('plus')}新建角色</button>`)}<div class="permission-grid"><section class="card card-pad"><div class="card-title">角色列表 <span class="badge">5 个角色</span></div><div class="role-list">${Object.entries(roleInfo).map(([id, info]) => `<button class="role-item ${role === id ? 'active' : ''}" onclick="setState({activePermissionRole:'${id}'})"><span>${info.label}</span><span class="badge">${id === 'platform' ? '全量' : id === 'leader' ? '只读' : '已配置'}</span></button>`).join('')}</div><div class="notice" style="margin-top:16px;margin-bottom:0">${icon('info')}<div><strong>权限模型</strong><p>菜单、操作、数据范围三层同时校验，前端隐藏不作为授权依据。</p></div></div></section><section class="card"><div class="card-title card-pad" style="padding-bottom:0">${roleInfo[role].label} · 操作权限 <span class="badge blue">${can.length} 项已授权</span></div><div class="check-row header"><span>功能模块</span><span>查看</span><span>办理</span><span>管理</span></div>${permissions.map(name => `<div class="check-row"><label>${name}</label><span><input type="checkbox" checked ${can.includes(name) ? '' : 'disabled'}></span><span><input type="checkbox" ${can.includes(name) ? 'checked' : ''}></span><span><input type="checkbox" ${role === 'platform' || (role === 'content' && ['帖子审核','评论审核'].includes(name)) ? 'checked' : ''}></span></div>`).join('')}</section></div>`;
 }
 
@@ -222,6 +223,7 @@ function renderModal() {
 }
 
 function renderPage() {
+  if (state.page === 'dialog-messages') return window.PrivateChat?.page() || '';
   if (window.ManagementWorkflow) return window.ManagementWorkflow.page(state.page);
   const pages = {
     dashboard: renderDashboard, review: renderReview, assignments: renderAssignments, handling: renderHandling,
@@ -321,6 +323,10 @@ function refineOperationsWorkbench() {
 function render() {
   const sidebarScroll = document.querySelector('.sidebar')?.scrollTop || 0;
   document.getElementById('app').innerHTML = renderShell();
+  const brandSubtitle = document.querySelector('.topbar-brand small');
+  if (brandSubtitle) brandSubtitle.textContent = '湖北省供销合作总社职工交流平台测试';
+  const globalSearch = document.querySelector('.global-search-input');
+  if (globalSearch) globalSearch.placeholder = '搜索事项、帖子、用户或编号';
   refineOperationsWorkbench();
   document.querySelector('.sidebar').scrollTop = sidebarScroll;
   if (window.lucide) window.lucide.createIcons();

@@ -318,6 +318,52 @@ button { cursor: pointer; }
 .sidebar-note { margin: auto 10px 0; padding: 16px 0 0; border-top: 1px solid rgba(255,255,255,.12); color: rgba(255,255,255,.35); font-size: 11px; line-height: 1.7; }
 .workspace-sidebar { display: flex; flex-direction: column; }
 .workspace-main { min-width: 0; padding: 28px 34px 42px; }
+.workspace.role-staff .workspace-topbar { grid-row: 1; }
+.workspace.role-staff .side-item .icon { width: 16px; height: 16px; }
+.workspace.role-staff .topbar-brand { width: 345px; }
+.workspace.role-staff .topbar-search { width: min(430px, 38vw); margin-left: auto; }
+/* 职工端一级菜单与管理端统一使用左侧纵向导航。 */
+.workspace.role-staff { grid-template-columns: 232px minmax(0, 1fr); grid-template-rows: 66px 1fr; }
+.workspace.role-staff .workspace-sidebar { position: sticky; top: 66px; grid-row: 2; height: calc(100vh - 66px); padding: 21px 11px; flex-direction: column; align-items: stretch; overflow-y: auto; color: rgba(255,255,255,.68); background: linear-gradient(180deg, #303235, #202224); border-bottom: 0; box-shadow: none; }
+.workspace.role-staff .side-caption, .workspace.role-staff .sidebar-note { display: block; }
+.workspace.role-staff .side-item { width: 100%; min-width: 0; height: 39px; margin: 2px 0; padding: 0 11px; justify-content: flex-start; border-bottom: 0; color: inherit; background: transparent; }
+.workspace.role-staff .side-item:hover { color: #fff; background: rgba(255,255,255,.08); }
+.workspace.role-staff .side-item.active { color: #fff; background: var(--role); border-bottom: 0; box-shadow: 0 5px 12px color-mix(in srgb, var(--role) 28%, transparent); }
+.workspace.role-staff .workspace-main { grid-row: 2; width: auto; margin: 0; padding: 28px 34px 42px; }
+@media (max-width: 600px) { .workspace.role-staff { grid-template-columns: 64px minmax(0, 1fr); } .workspace.role-staff .workspace-sidebar { padding: 14px 8px; } .workspace.role-staff .side-caption, .workspace.role-staff .side-item span, .workspace.role-staff .sidebar-note { display: none; } .workspace.role-staff .side-item { justify-content: center; padding: 0; } .workspace.role-staff .workspace-main { padding: 22px 16px 34px; } }
+
+/* 保持职工端与管理端一致：桌面原型窗口始终使用左侧一级导航，避免窄视口横向溢出造成菜单错位。 */
+.workspace.role-staff { overflow-x: hidden; }
+html:has(.workspace.role-staff), body:has(.workspace.role-staff) { min-width:0; }
+.workspace.role-staff .workspace-main { min-width: 0; }
+.owner-operation-menu { position:relative; }
+.owner-operation-menu summary { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--red); color:var(--red); cursor:pointer; list-style:none; }
+.owner-operation-menu summary::-webkit-details-marker { display:none; }
+.owner-operation-options { position:absolute; right:0; bottom:100%; min-width:160px; z-index:30; padding:6px; background:#fff; border:1px solid var(--line); box-shadow:0 6px 20px #0002; }
+.personal-post-owner-actions .owner-operation-options button { display:flex; width:100%; border:0; margin:0; padding:10px; text-align:left; }
+.owner-operation-options button:hover { background:#f9eeee; }
+.owner-operation-menu .icon { width:16px; height:16px; }
+.owner-settings-dialog { width:min(420px,calc(100vw - 40px)); padding:24px; border:1px solid var(--line); border-radius:6px; color:var(--ink); }
+.owner-settings-dialog::backdrop { background:#0006; }
+.owner-settings-dialog header,.owner-settings-dialog footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.owner-settings-dialog h2 { margin:0; font-size:20px; }
+.owner-settings-dialog fieldset { margin:24px 0; padding:16px; border:1px solid var(--line); }
+.owner-settings-dialog fieldset label { margin-right:24px; }
+.owner-comment-setting { display:flex; justify-content:space-between; padding:10px 0 24px; }
+.owner-settings-dialog footer { justify-content:flex-end; border-top:1px solid var(--line); padding-top:18px; }
+.owner-settings-dialog button { padding:8px 18px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+.owner-settings-dialog .primary { color:#fff; background:var(--red); border-color:var(--red); }
+.official-reply-block { margin-bottom: 18px; padding: 18px; border: 1px solid var(--line); background: #fff; }
+.official-reply-block-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.official-reply-block h3 { margin: 4px 0 10px; font-size: 16px; }
+.official-reply-block > p { margin: 0 0 16px; color: var(--ink); line-height: 1.8; }
+.official-reply-compose { padding-top: 14px; border-top: 1px solid var(--line); }
+.official-reply-compose label { display:block; margin-bottom:7px; color:var(--muted); font-size:12px; }
+.official-reply-compose textarea { width:100%; min-height:72px; padding:10px; border:1px solid var(--line); resize:vertical; font:inherit; box-sizing:border-box; }
+.official-reply-compose button { margin-top:9px; min-height:32px; padding:0 14px; border:0; color:#fff; background:var(--role); cursor:pointer; }
+.staff-home-compose { min-height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; border: 1px solid var(--role); color: #fff; background: var(--role); font-size: 13px; font-weight: 700; cursor: pointer; }
+.staff-home-compose:hover { background: #951f27; }
+.staff-home-compose .icon { width: 16px; height: 16px; }
 .page-head { display: flex; align-items: end; justify-content: space-between; margin-bottom: 22px; padding-bottom: 17px; border-bottom: 1px solid var(--line); }.page-kicker { color: var(--role); font-size: 11px; font-weight: 700; letter-spacing: 1px; }.page-kicker::before { content: ""; display: inline-block; width: 20px; height: 2px; margin: 0 7px 3px 0; background: var(--gold); }.page-head h1 { margin: 4px 0 3px; font: 600 27px/1.35 SimSun, serif; letter-spacing: .5px; }.page-head p { margin: 0; color: var(--muted); font-size: 12px; }.page-head .date { color: var(--muted); font-size: 12px; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }.metric { min-height: 127px; padding: 18px; position: relative; overflow: hidden; border: 1px solid var(--line); border-left: 3px solid var(--role); background: #fff; }.metric::after { content: ""; position: absolute; width: 84px; height: 84px; right: -31px; top: -37px; border: 1px solid var(--role-soft); border-radius: 50%; }.metric label { display:block; color: var(--muted); font-size: 12px; }.metric strong { display:block; margin: 7px 0 3px; font: 700 29px/1.15 "Bahnschrift", "Arial Narrow", sans-serif; }.metric span { color: var(--green); font-size: 11px; }.metric.warn span { color: #ad7317; }.metric.info span { color: var(--blue); }
 .content-grid { display: grid; grid-template-columns: minmax(530px, 1.15fr) minmax(330px, .65fr); gap: 16px; margin-top: 17px; }.panel { border: 1px solid var(--line); background: #fff; }.panel-header { min-height: 51px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }.panel-header h2 { margin:0; font-size: 15px; }.panel-header button { border:0; padding: 4px; color: var(--role); background:transparent; font-size: 12px; }.table-row { display: grid; grid-template-columns: 1fr 86px 78px; align-items: center; gap: 10px; padding: 13px 18px; border-bottom: 1px solid #eeefec; }.table-row:last-child { border-bottom: 0; }.table-row strong { font-size: 13px; font-weight: 600; }.table-row small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }.status { width: max-content; padding: 3px 7px; color: var(--role); background: var(--role-soft); font-size: 11px; }.status.warn { color: #95631d; background: #fbf1dd; }.status.done { color: var(--green); background: #e6f4ed; }.row-date { color: var(--muted); font-size: 11px; text-align: right; }
@@ -328,7 +374,8 @@ button { cursor: pointer; }
 /* Staff portal */
 .portal-head { margin-bottom: 18px; }
 .portal-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(300px, 3fr); gap: 16px; align-items: stretch; }
-.staff-home-grid { grid-template-columns: minmax(0, 7fr) minmax(250px, 3fr); gap: 20px; }
+.staff-home-grid { grid-template-columns: minmax(0, 7.2fr) minmax(280px, 2.8fr); gap: 20px; }
+@media (max-width:1100px) { .workspace.role-staff .staff-home-grid { grid-template-columns:minmax(0,1fr); } .workspace.role-staff .staff-home-grid .portal-utility-column { position:static; max-height:none; } }
 .portal-utility-column, .portal-content-column { min-width: 0; }
 .staff-home-grid .portal-utility-column { position: sticky; top: 78px; align-self: start; display: flex; flex-direction: column; max-height: calc(100vh - 90px); }
 .staff-home-grid .notice-panel { flex: none; }
@@ -1120,3 +1167,156 @@ html.mobile-staff-view .ranking-backdrop { z-index: 50; align-items: end; paddin
   .affair-progress-steps li { font-size: 9px; }
   .affair-progress-summary li { align-items: flex-start; flex-direction: column; gap: 3px; }
 }
+
+/* ==================== 消息中心：一级 tab 与三个内容区 ==================== */
+.message-center { margin-top: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); box-shadow: var(--shadow); overflow: hidden; }
+.message-center .knowledge-notice-section { margin-top: 0; }
+.message-tabs { display: flex; align-items: center; gap: 2px; padding: 0 15px; border-bottom: 1px solid var(--line); background: #fbfbfa; }
+.message-tab { min-height: 48px; padding: 0 17px; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: transparent; font-size: 13px; letter-spacing: 1px; transition: color .18s ease, background-color .18s ease, border-color .18s ease; }
+.message-tab:hover { color: var(--red); background: rgba(181, 44, 47, .04); }
+.message-tab.active { color: var(--red); border-bottom-color: var(--red); background: var(--paper); font-weight: 700; }
+.message-tab-badge { min-width: 17px; display: inline-block; margin-left: 6px; padding: 1px 5px; border-radius: 9px; color: #fff; background: var(--red); font-size: 10px; line-height: 16px; text-align: center; vertical-align: 1px; }
+.message-section-head { min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 10px 17px; border-bottom: 1px solid var(--line); }
+.message-section-head-actions-only { justify-content: flex-end; min-height: 48px; }
+.message-section-head > div:first-child { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.message-section-mark { width: 3px; height: 20px; flex: none; border-radius: 2px; background: var(--red); }
+.message-section-head h2 { margin: 0; font: 600 18px/1.3 SimSun, "STSong", serif; }
+.message-section-head p { margin: 2px 0 0; color: var(--muted); font-size: 10px; }
+.message-section-actions { display: flex; align-items: center; gap: 13px; flex: none; }
+.message-section-actions button { padding: 0; border: 0; color: var(--red); background: transparent; font-size: 10px; }
+.message-section-actions button:hover { text-decoration: underline; }
+.message-unread-count { color: var(--muted); font-size: 10px; }
+.message-unread-count.has-unread { color: var(--red); font-weight: 700; }
+.message-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px; background: #f7f7f5; }
+.message-item { min-width: 0; min-height: 124px; display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px 12px; border: 1px solid #e7e8e4; background: var(--paper); }
+.message-item:hover { border-color: #dcd8d4; }
+.message-item.read { background: #fcfcfb; }
+.message-item-icon { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--red-pale); color: var(--red); }
+.message-item.read .message-item-icon { background: #f2f2f0; color: var(--muted); }
+.message-item-icon .icon { width: 16px; height: 16px; }
+.message-item-main { min-width: 0; flex: 1; }
+.message-item-meta { display: flex; align-items: center; gap: 8px; }
+.message-item-type { padding: 1px 7px; border-radius: 9px; color: var(--red); background: var(--red-pale); font-size: 10px; font-weight: 700; white-space: nowrap; }
+.message-item.read .message-item-type { color: var(--muted); background: #f2f2f0; }
+.message-item-meta > small { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.message-item-main h3 { margin: 7px 0 4px; font-size: 13px; line-height: 1.45; }
+.message-unread-dot { width: 6px; height: 6px; display: inline-block; margin: 0 0 2px 5px; border-radius: 50%; background: var(--red); }
+.message-item-main p { display: -webkit-box; overflow: hidden; margin: 0; color: #5d6266; font-size: 11px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.message-item-note { margin-top: 7px; }
+.message-item-scope { display: inline-flex; align-items: center; padding: 1px 7px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--paper); font-size: 9px; }
+.message-item-scope.public { color: var(--green); border-color: #cbe3d7; background: #f4faf7; }
+.message-item-actions { flex: none; align-self: center; }
+.message-item-actions button { min-height: 27px; padding: 0 10px; border: 1px solid #d6a8a9; color: var(--red); background: var(--paper); font-size: 10px; white-space: nowrap; }
+.message-item-actions button:hover { color: #fff; background: var(--red); }
+.message-empty { grid-column: 1 / -1; margin: 0; padding: 34px 10px; color: var(--muted); background: var(--paper); text-align: center; font-size: 11px; }
+.message-foot { padding: 11px; color: #9a9e9b; border-top: 1px solid var(--line); background: var(--paper); font-size: 10px; text-align: center; }
+
+/* 移动端消息中心 */
+.mobile-message-tabs { margin-top: 4px; }
+.mobile-message-tabs b { min-width: 15px; display: inline-block; margin-left: 4px; padding: 1px 4px; border-radius: 9px; color: #fff; background: var(--red); font-size: 9px; font-weight: 700; }
+.mobile-reply-scope { margin-right: auto; padding: 1px 7px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 9px; }
+.mobile-notice-list .knowledge-notice-empty { padding: 26px 12px; }
+
+@media (max-width: 820px) {
+  .message-tabs { padding: 0 4px; }
+  .message-tab { min-height: 44px; padding: 0 12px; font-size: 12px; letter-spacing: 0; }
+  .message-list { grid-template-columns: 1fr; }
+  .message-item-actions { align-self: flex-end; }
+  .message-section-head { min-height: 56px; padding: 9px 13px; }
+  .message-section-head h2 { font-size: 16px; }
+}
+
+/* ==================== 消息中心补充规范（沿用现有令牌，未新增色值） ====================
+   1) 官方回复列表项用 :has(.message-item-scope) 命中（无需改动 app.js / mobile.js），
+      复用 .knowledge-question-answer 的「左侧 3px 红条 + 宋体标题」权威答复视觉语言。
+   2) 二级页签在消息中心内降级为中性灰常规字重，使「红色 = 一级导航」成为唯一强信号，
+      避免一级/二级页签被误认为同级导航。
+   3) 移动端一级页签触控高度与字距按消息中心口径收敛。
+   -------------------------------------------------------------------------------- */
+.message-item:has(.message-item-scope) { border-left: 3px solid var(--red); }
+.message-item:has(.message-item-scope) .message-item-main h3 {
+  font-family: SimSun, "STSong", serif;
+  letter-spacing: .3px;
+}
+/* 二级页签在消息中心内降级为中性灰常规字重：一级页签（红/粗）为唯一强信号 */
+.message-center .knowledge-notice-tabs button.active {
+  color: var(--muted);
+  background: var(--paper);
+  font-weight: 400;
+  box-shadow: inset 0 -2px 0 var(--line);
+}
+.mobile-message-tabs button { min-height: 48px; font-size: 12px; letter-spacing: 1px; }
+.mobile-message-tabs button.active { box-shadow: inset 0 -2px 0 var(--red); }
+
+/* ==================== 消息中心弹窗视觉统一 ====================
+   背景：消息中心内三个详情弹窗此前各用一套规格 ——
+     通知公告(.knowledge-modal 680px，无底部操作区)
+     互动(.interaction-detail-modal 560px，底部用 .post-compose-actions，按钮 36px)
+     官方回复(.affair-progress-modal 960px，底部用 .ranking-modal-foot，按钮 29px)
+   目标：三者共用同一套底部操作区、按钮尺寸与圆角语言，窄版宽度统一。
+   作用域限定在这三个弹窗内，不改动榜单、政策详情等其他弹窗的既有表现。 */
+/* 1) 底部操作区：统一为右对齐 flex 行 */
+.knowledge-modal .ranking-modal-foot,
+.interaction-detail-modal .ranking-modal-foot,
+.affair-progress-modal .ranking-modal-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 9px;
+  padding: 11px 24px; border-top: 1px solid var(--line); background: #fafbfa;
+}
+/* 2) 底部按钮：统一尺寸与主次配色（主操作 = 红底白字，次操作 = 白底灰边） */
+.knowledge-modal .ranking-modal-foot button,
+.interaction-detail-modal .ranking-modal-foot button,
+.affair-progress-modal .ranking-modal-foot button {
+  min-width: 86px; min-height: 34px; padding: 0 16px;
+  border: 1px solid var(--line); border-radius: 2px;
+  background: #fff; color: var(--ink); font-size: 12px;
+}
+.knowledge-modal .ranking-modal-foot button.primary,
+.interaction-detail-modal .ranking-modal-foot button.primary,
+.affair-progress-modal .ranking-modal-foot button.primary,
+.affair-progress-modal .ranking-modal-foot .personal-progress-close {
+  border-color: var(--red); background: var(--red); color: #fff;
+}
+/* 3) 窄版弹窗宽度统一到 680px（互动详情原为 560px） */
+.interaction-detail-modal { width: min(680px, calc(100vw - 68px)); }
+/* 4) 弹窗圆角与卡片语言一致（.ranking-modal 已 overflow:hidden，不会溢出） */
+.ranking-modal { border-radius: var(--radius); }
+.post-compose-modal { position: relative; }
+.draft-box-trigger { margin-left: auto; padding: 8px 12px; border: 1px solid var(--line, #ddd); background: #fff; border-radius: 4px; }
+.staff-draft-box { position: absolute; z-index: 3; inset: 72px 16px auto; max-height: 65vh; overflow: auto; background: #fff; border: 1px solid #ddd; box-shadow: 0 8px 30px #0002; border-radius: 6px; padding: 16px; }
+.staff-draft-box header, .staff-draft-box article { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.staff-draft-box header { justify-content: space-between; }
+.staff-draft-box article { border-top: 1px solid #eee; }
+.staff-draft-box article > div { flex: 1; min-width: 0; }
+.staff-draft-box strong { display: block; overflow-wrap: anywhere; }
+.staff-draft-box small { display: block; margin-top: 6px; color: #777; }
+.staff-draft-box button, .staff-notice-toolbar > button { border: 1px solid #ddd; padding: 6px 10px; background: #fff; border-radius: 4px; flex-shrink: 0; }
+.staff-voice-tools, .staff-profile-actions, .staff-notice-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.staff-voice-tools input { flex: 1; min-width: 160px; padding: 9px 12px; border: 1px solid #ddd; border-radius: 4px; }
+.staff-notice-toolbar { justify-content: space-between; padding: 16px; border-bottom: 1px solid #eee; }
+.staff-notice-toolbar .knowledge-notice-tabs { margin: 0; border: 0; }
+.staff-draft-card p { overflow-wrap: anywhere; }
+.staff-profile-form { display: grid; gap: 16px; padding: 20px 24px; }
+.staff-profile-form > label { display: grid; gap: 8px; }
+.staff-profile-form input:not([type=radio]) { width: 100%; border: 1px solid #d8dde5; border-radius: 4px; padding: 9px 12px; }
+.staff-profile-form input:disabled { color: #888; background: #f5f5f5; }
+.staff-profile-form fieldset { display: flex; gap: 16px; flex-wrap: wrap; border: 0; padding: 0; }
+.staff-profile-form legend { margin-bottom: 8px; }
+.staff-profile-form fieldset small { width: 100%; color: #777; }
+.staff-profile-form img { object-fit: cover; border-radius: 50%; }
+.staff-profile-form .post-compose-actions { margin: 0 -24px -20px; }
+.personal-edit-modal > form { max-height: calc(90vh - 90px); overflow-y: auto; }
+.staff-profile-form fieldset label { display: inline-flex; align-items: center; gap: 6px; }
+.staff-profile-form input[type=radio] { width: 16px; height: 16px; padding: 0; margin: 0; }
+.staff-profile-form input[type=file] { height: auto; }
+.personal-edit-modal form .post-compose-actions { position: sticky; bottom: 0; background: #fff; z-index: 1; }
+.personal-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+html.knowledge-view .knowledge-page, html.personal-view .personal-center { min-width: 0; }
+.message-item-main { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 800px) {
+  .message-item { flex-wrap: wrap; }
+  .message-item-actions { width: 100%; justify-content: flex-end; }
+  .staff-draft-box { inset: 70px 8px auto; }
+}
+.official-reply-compose[hidden], .official-reply-expand[hidden] { display:none; }
+.official-reply-expand { border:0; background:none; color:#b72b31; font:inherit; font-size:13px; cursor:pointer; padding:4px 0 4px 12px; margin-left:auto; }
+.official-reply-compose .message-inline-actions button:not(.primary) { background:none; color:#858992; border:0; }
